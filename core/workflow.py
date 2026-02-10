@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from core.state import PlanState
 from core.nodes.normalize_input import normalize_input_node
 from core.nodes.select_material import select_material_node
+from core.nodes.plan_orientation import plan_orientation_node
 
 
 def dummy_plan_node(state: PlanState) -> PlanState:
@@ -13,7 +14,7 @@ def dummy_plan_node(state: PlanState) -> PlanState:
     state["plan"] = {
         "summary": f"Draft plan for: {desc}",
         "material": state.get("material", {}),
-        "recommended_orientation": "Lay flat on the largest face",
+        "orientation": state.get("orientation", {}),
         "slicer_settings": {
             "layer_height_mm": 0.2,
             "walls": 3,
@@ -36,10 +37,11 @@ def build_plan_app():
     graph.add_node("NORMALIZE_INPUT", normalize_input_node)
     graph.add_node("SELECT_MATERIAL", select_material_node)
     graph.add_node("DUMMY_PLAN", dummy_plan_node)
+    graph.add_node("PLAN_ORIENTATION", plan_orientation_node)
 
     graph.add_edge(START, "NORMALIZE_INPUT")
     graph.add_edge("NORMALIZE_INPUT", "SELECT_MATERIAL")
-    graph.add_edge("SELECT_MATERIAL", "DUMMY_PLAN")
+    graph.add_edge("SELECT_MATERIAL", "PLAN_ORIENTATION")
+    graph.add_edge("PLAN_ORIENTATION", "DUMMY_PLAN")
     graph.add_edge("DUMMY_PLAN", END)
-
     return graph.compile()

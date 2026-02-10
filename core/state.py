@@ -18,3 +18,4 @@ class PlanState(TypedDict, total=False):
     # --- Final output ---
     plan: Dict[str, Any]
     material: Dict[str, Any]
+    orientation: Dict[str, Any]
