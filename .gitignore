@@ -11,3 +11,5 @@ __pycache__/
 # PyCharm / IntelliJ
 .idea/
 *.iml
+
+.chroma/
