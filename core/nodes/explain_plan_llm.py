@@ -15,7 +15,10 @@ def explain_plan_llm_node(state: PlanState) -> PlanState:
     plan = state.get("plan", {})
     plan_json = json.dumps(plan, ensure_ascii=False, indent=2)
 
-    user_prompt = template.format(plan_json=plan_json)
+    user_prompt = template.format(
+        plan_json=plan_json,
+        rag_context=state.get("rag_context", "")
+    )
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
 

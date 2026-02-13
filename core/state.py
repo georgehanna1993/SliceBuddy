@@ -22,3 +22,5 @@ class PlanState(TypedDict, total=False):
     slicer_settings: Dict[str, Any]
     risks: Dict[str, Any]
     plan_explanation: str
+    rag_context: str
+    rag_sources: list[str]

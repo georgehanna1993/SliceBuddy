@@ -34,4 +34,5 @@ def plan(req: PlanRequest):
         "plan_explanation": result.get("plan_explanation", ""),
         "assumptions": result.get("assumptions", []),
         "warnings": result.get("warnings", []),
+
     }

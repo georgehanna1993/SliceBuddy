@@ -6,6 +6,10 @@ Rules:
 - Be honest about assumptions and unknown geometry.
 - Use bullet points.
 - Do not invent printer-specific settings (no temps/speeds unless explicitly provided).
+- If KNOWLEDGE_CONTEXT is empty, ignore it.
+
+KNOWLEDGE_CONTEXT:
+{rag_context}
 
 PLAN_JSON:
 {plan_json}
