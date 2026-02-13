@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from core.workflow import build_plan_app
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI(title="SliceBuddy", version="0.1.0")
 
@@ -29,6 +31,7 @@ def plan(req: PlanRequest):
 
     return {
         "plan": result.get("plan", {}),
+        "plan_explanation": result.get("plan_explanation", ""),
         "assumptions": result.get("assumptions", []),
         "warnings": result.get("warnings", []),
     }

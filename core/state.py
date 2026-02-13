@@ -21,3 +21,4 @@ class PlanState(TypedDict, total=False):
     orientation: Dict[str, Any]
     slicer_settings: Dict[str, Any]
     risks: Dict[str, Any]
+    plan_explanation: str

@@ -1,0 +1,11 @@
+Given the following print plan data (JSON), explain it to a maker in clear, practical steps.
+
+Rules:
+- Keep it short and structured.
+- Mention: material, orientation, key slicer settings, and risks/mitigations.
+- Be honest about assumptions and unknown geometry.
+- Use bullet points.
+- Do not invent printer-specific settings (no temps/speeds unless explicitly provided).
+
+PLAN_JSON:
+{plan_json}
