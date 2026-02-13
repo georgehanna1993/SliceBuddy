@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, START, END
+import os
 from core.state import PlanState
 from core.nodes.normalize_input import normalize_input_node
 from core.nodes.select_material import select_material_node
@@ -32,6 +33,7 @@ def dummy_plan_node(state: PlanState) -> PlanState:
 
 def build_plan_app():
     graph = StateGraph(PlanState)
+    use_llm = os.getenv("USE_LLM_EXPLAINER", "true").lower() in ("1", "true", "yes")
 
     # 1) Register ALL nodes (every name you use in add_edge must exist here)
     graph.add_node("NORMALIZE_INPUT", normalize_input_node)
@@ -40,7 +42,8 @@ def build_plan_app():
     graph.add_node("GENERATE_SLICER_SETTINGS", generate_slicer_settings_node)
     graph.add_node("ANALYZE_RISKS", analyze_risks_node)
     graph.add_node("DUMMY_PLAN", dummy_plan_node)
-    graph.add_node("EXPLAIN_PLAN", explain_plan_llm_node)
+    if use_llm:
+        graph.add_node("EXPLAIN_PLAN", explain_plan_llm_node)
 
     # 2) Connect them in one clean chain
     graph.add_edge(START, "NORMALIZE_INPUT")
@@ -49,7 +52,11 @@ def build_plan_app():
     graph.add_edge("PLAN_ORIENTATION", "GENERATE_SLICER_SETTINGS")
     graph.add_edge("GENERATE_SLICER_SETTINGS", "ANALYZE_RISKS")
     graph.add_edge("ANALYZE_RISKS", "DUMMY_PLAN")
-    graph.add_edge("DUMMY_PLAN", "EXPLAIN_PLAN")
-    graph.add_edge("EXPLAIN_PLAN", END)
+
+    if use_llm:
+        graph.add_edge("DUMMY_PLAN", "EXPLAIN_PLAN")
+        graph.add_edge("EXPLAIN_PLAN", END)
+    else:
+        graph.add_edge("DUMMY_PLAN", END)
 
     return graph.compile()
