@@ -1,0 +1,94 @@
+[
+  {
+    "id": "1770980685",
+    "title": "simple phone stand with a hole i",
+    "ts": "2026-02-13T13:04:45",
+    "payload": {
+      "description": "simple phone stand with a hole in the middle that fits MagSafe charger",
+      "height_mm": 20.0,
+      "width_mm": 10.0
+    },
+    "response": {
+      "plan": {
+        "summary": "Draft plan for: simple phone stand with a hole in the middle that fits MagSafe charger",
+        "material": {
+          "recommended": "PLA",
+          "reason": "PLA is easy to print and suitable for most decorative or general-purpose models.",
+          "alternatives": [
+            "PETG"
+          ],
+          "signals": {
+            "keyword_based": true,
+            "height_mm": 20.0,
+            "width_mm": 10.0
+          }
+        },
+        "orientation": {
+          "recommended": "Lay flat on the largest face",
+          "reason": "Maximizes bed contact and reduces the chance of tipping.",
+          "signals": {
+            "height_mm": 20.0,
+            "width_mm": 10.0,
+            "aspect_ratio": 2.0
+          },
+          "tradeoffs": [
+            "May show the best surface on the top face depending on geometry.",
+            "May increase support needs if the model has overhangs."
+          ],
+          "bed_adhesion_tips": [
+            "Clean bed and use appropriate bed temp for your material.",
+            "Consider brim or mouse-ears due to small footprint."
+          ]
+        },
+        "slicer_settings": {
+          "material": "PLA",
+          "settings": {
+            "layer_height_mm": 0.2,
+            "walls": 3,
+            "top_bottom_layers": 4,
+            "infill_percent": 15,
+            "supports": "auto (only if needed)",
+            "brim_mm": 6,
+            "notes": [
+              "PLA: keep cooling on; easy printing profile.",
+              "Small footprint: brim recommended for adhesion."
+            ]
+          },
+          "signals": {
+            "height_mm": 20.0,
+            "width_mm": 10.0,
+            "aspect_ratio": 2.0
+          }
+        },
+        "risks": {
+          "summary": {
+            "count": 1,
+            "highest_severity": "high"
+          },
+          "items": [
+            {
+              "id": "adhesion_small_footprint",
+              "severity": "high",
+              "why": "Small footprint (width≈10.0mm) can detach from bed easily."
+            }
+          ],
+          "mitigations": [
+            "Add brim/mouse-ears, clean bed, and consider slower first layer."
+          ]
+        },
+        "notes": [
+          "Dimensions received: height=20.0mm, width=10.0mm",
+          "This is a placeholder plan. Real logic will be added node-by-node."
+        ]
+      },
+      "plan_explanation": "### Print Plan for Simple Phone Stand\n\n**Material:**\n- **Recommended:** PLA\n  - **Reason:** Easy to print, suitable for decorative/general-purpose models.\n- **Alternative:** PETG\n\n**Orientation:**\n- **Recommended:** Lay flat on the largest face\n  - **Reason:** Maximizes bed contact, reduces tipping risk.\n  - **Trade-offs:** \n    - Best surface finish may be on top face.\n    - May require supports for overhangs.\n- **Bed Adhesion Tips:**\n  - Clean the bed and use the appropriate bed temperature for PLA.\n  - Consider using a brim or mouse-ears due to the small footprint.\n\n**Key Slicer Settings:**\n- **Layer Height:** 0.2 mm\n- **Walls:** 3 (provides good strength)\n- **Top/Bottom Layers:** 4\n- **Infill Percentage:** 15% (suitable for decorative prints)\n- **Supports:** Auto (only if needed)\n- **Brim:** 6 mm (recommended for adhesion due to small footprint)\n- **Notes:** \n  - Keep cooling on for PLA.\n  - Use a brim for better adhesion.\n\n**Risks:**\n- **Adhesion Risk:** \n  - **Severity:** High\n  - **Why:** Small footprint (width ≈ 10.0 mm) can easily detach from the bed.\n- **Mitigations:**\n  - Use a brim or mouse-ears.\n  - Ensure the bed is clean.\n  - Consider slowing down the first layer speed for better adhesion.\n\n**Notes:**\n- Dimensions: Height = 20.0 mm, Width = 10.0 mm.\n- This is a draft plan; further refinements may be needed based on actual geometry.",
+      "assumptions": [
+        "Small footprint detected. Bed adhesion may be critical; consider brim."
+      ],
+      "warnings": [
+        "Small footprint detected. Bed adhesion may be critical.",
+        "Small footprint: bed adhesion is critical; brim recommended."
+      ]
+    }
+  }
+]

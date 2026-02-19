@@ -34,5 +34,7 @@ def rag_retrieve_node(state: PlanState) -> PlanState:
 
     state["rag_context"] = "\n\n---\n\n".join(snippets)
     state["rag_sources"] = list(dict.fromkeys(sources))  # unique, keep order
+    MAX_RAG_CHARS = 1800
+    state["rag_context"] = state["rag_context"][:MAX_RAG_CHARS]
 
     return state

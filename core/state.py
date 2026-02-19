@@ -7,6 +7,13 @@ class PlanState(TypedDict, total=False):
     height_mm: float
     width_mm: float
 
+    # STL input (optional)
+    stl_path: str
+    stl_features: Dict[str, Any]
+
+    # --- Control flags ---
+    stop: bool
+
     # --- Normalized/validated inputs ---
     input_raw: Dict[str, Any]
     input_norm: Dict[str, Any]
@@ -22,5 +29,7 @@ class PlanState(TypedDict, total=False):
     slicer_settings: Dict[str, Any]
     risks: Dict[str, Any]
     plan_explanation: str
+
+    # --- RAG ---
     rag_context: str
-    rag_sources: list[str]
+    rag_sources: List[str]

@@ -56,25 +56,39 @@ def analyze_risks_node(state: PlanState) -> PlanState:
     # ------------------------------------------------------------
     # 1) Mesh integrity risk (SMART)
     # ------------------------------------------------------------
-    if used_stl and not watertight:
-        # Intentionally open-top container → not "high risk", just informational
-        if likely_open_top:
-            add_risk(
-                "mesh_open_top",
-                "low",
-                "STL is not watertight, but it looks like an intentionally open-top shape (boundary edges mostly at the top).",
-                "This is usually fine. If slicing looks weird, run a quick repair; otherwise print normally.",
-            )
-            add_warning_once("STL is not watertight, but likely intentional (open-top).")
-        else:
-            # Truly broken mesh (random holes/seams)
-            add_risk(
-                "mesh_not_watertight",
-                "high",
-                f"STL mesh is not watertight (open edges/holes). Boundary edges detected: {open_edges}. Slicing/volume can be unreliable.",
-                "Repair the STL (Orca/PrusaSlicer repair, Netfabb, Meshmixer) before printing.",
-            )
-            add_warning_once("Mesh integrity issue: STL is not watertight. Consider repairing before printing.")
+    # --- Mesh integrity risk ---
+    if used_stl:
+        boundary_edges = int(stl.get("boundary_edges", 0) or 0)
+        nonmanifold_edges = int(stl.get("nonmanifold_edges", 0) or 0)
+        open_edges = int(stl.get("open_edges", boundary_edges + nonmanifold_edges) or 0)
+        likely_open_top = bool(stl.get("likely_open_top", False))
+        is_volume = bool(stl.get("is_volume", True))
+        watertight = bool(stl.get("watertight", True))
+
+        if not watertight or open_edges > 0 or not is_volume:
+            # Decide message flavor
+            if likely_open_top and open_edges > 0:
+                why = (
+                    f"STL is not a closed solid (open rim detected: boundary_edges={boundary_edges}). "
+                    "This might be intentional (open-top container), but volume will be unreliable."
+                )
+                fix = (
+                    "If the open top is intentional: it's fine to print. "
+                    "If you expected a solid: repair/close the mesh before printing."
+                )
+                severity = "medium"
+            else:
+                why = (
+                    f"STL is not watertight (boundary_edges={boundary_edges}, nonmanifold_edges={nonmanifold_edges}). "
+                    "This indicates holes/open seams; slicing/volume can be unreliable."
+                )
+                fix = (
+                    "Repair the STL (Orca/PrusaSlicer repair, Netfabb, Meshmixer) before printing."
+                )
+                severity = "high"
+
+            add_risk("mesh_not_watertight", severity, why, fix)
+            warnings.append("Mesh integrity issue detected. Consider repairing the STL before printing.")
 
     # If not a closed volume, volume-based estimates are unreliable
     if used_stl and not is_volume:

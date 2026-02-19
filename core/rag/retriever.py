@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import List, Tuple
 
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
+from langchain_chroma import Chroma
 from dotenv import load_dotenv
 load_dotenv()
 
