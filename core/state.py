@@ -24,6 +24,8 @@ class PlanState(TypedDict, total=False):
 
     # --- Final output ---
     plan: Dict[str, Any]
+    model_overview: str
+    beginner_labels: Dict[str, Any]
     material: Dict[str, Any]
     orientation: Dict[str, Any]
     slicer_settings: Dict[str, Any]

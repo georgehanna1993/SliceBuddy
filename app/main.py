@@ -1,37 +1,56 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.responses import JSONResponse
+import tempfile
+import os
+
 from core.workflow import build_plan_app
-from dotenv import load_dotenv
-load_dotenv()
 
-app = FastAPI(title="SliceBuddy", version="0.1.0")
+from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI()
 plan_app = build_plan_app()
 
-
-class PlanRequest(BaseModel):
-    description: str
-    height_mm: float
-    width_mm: float
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/plan")
-def plan(req: PlanRequest):
-    initial_state = {
-        "description": req.description,
-        "height_mm": req.height_mm,
-        "width_mm": req.width_mm,
-    }
-    result = plan_app.invoke(initial_state)
+async def plan_endpoint(
+    use: str = Form(...),
+    stl: UploadFile = File(...)
+):
+    # Save uploaded STL to a temp file
+    suffix = ".stl"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        contents = await stl.read()
+        tmp.write(contents)
+        tmp_path = tmp.name
 
-    return {
-        "plan": result.get("plan", {}),
-        "plan_explanation": result.get("plan_explanation", ""),
-        "assumptions": result.get("assumptions", []),
-        "warnings": result.get("warnings", []),
-    }
+    try:
+        result = plan_app.invoke({
+            "description": use,
+            "stl_path": tmp_path,
+        })
+
+        # Return only what UI needs (keep it simple)
+        return JSONResponse({
+            "stop": bool(result.get("stop")),
+            "model_overview": result.get("model_overview"),
+            "plan": result.get("plan"),
+            "warnings": result.get("warnings", []),
+            "risks": result.get("risks", {}),
+            "plan_explanation": result.get("plan_explanation", ""),
+            "stl_features": result.get("stl_features", {}),
+        })
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass

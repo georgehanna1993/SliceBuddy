@@ -183,15 +183,6 @@ def analyze_stl(path: str) -> Dict[str, Any]:
     if isinstance(mesh, trimesh.Scene):
         mesh = trimesh.util.concatenate([g for g in mesh.geometry.values()])
 
-    # (Optional) Keep your debug for now; remove later
-    print("DEBUG CHECKS ----------------")
-    print("is_watertight:", mesh.is_watertight)
-    print("is_volume:", mesh.is_volume)
-    print("is_winding_consistent:", getattr(mesh, "is_winding_consistent", None))
-    print("is_self_intersecting:", getattr(mesh, "is_self_intersecting", None))
-    print("euler_number:", getattr(mesh, "euler_number", None))
-    print("--------------------------------")
-
     x, y, z = [float(v) for v in mesh.extents]
     footprint_bbox = float(x * y)
 

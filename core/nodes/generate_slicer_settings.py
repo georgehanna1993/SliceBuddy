@@ -38,7 +38,9 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         "walls": 3,
         "top_bottom_layers": 4,
         "infill_percent": 15,
-        "supports": "auto (only if needed)",  # default: don’t force supports on unless we have evidence
+        "infill_pattern": "gyroid",
+        "infill_reason": "Good all-around strength and supports top layers well without harsh direction bias.",
+        "supports": "off (unknown geometry)",
         "brim_mm": 0,
         "notes": [],
     }
@@ -66,6 +68,27 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         settings["supports"] = "off unless absolutely necessary"
         settings["notes"].append("TPU: print slowly; avoid aggressive retraction.")
         assumptions.append("Assuming TPU printed slowly with conservative retraction settings.")
+
+    # --- Infill pattern selection (beginner-friendly) ---
+    # Functional / load parts
+    if any(k in desc for k in ["functional", "bracket", "mount", "holder", "clip", "tool", "hinge"]):
+        settings["infill_pattern"] = "gyroid"
+        settings["infill_reason"] = "Balanced strength in all directions for functional parts."
+
+    # Boxes / containers / organizers: fast, stable, clean walls
+    elif any(k in desc for k in ["box", "container", "bin", "organizer", "tray"]):
+        settings["infill_pattern"] = "grid"
+        settings["infill_reason"] = "Fast, predictable, and plenty strong for simple containers."
+
+    # Decorative / figurines: smooth + consistent, not overkill
+    elif any(k in desc for k in ["figurine", "statue", "decor", "ornament", "model"]):
+        settings["infill_pattern"] = "gyroid"
+        settings["infill_reason"] = "Keeps strength consistent without needing high infill."
+
+    # Tall skinny things: avoid wobble → use something stable
+    if aspect >= 3.0:
+        settings["infill_pattern"] = "gyroid"
+        settings["infill_reason"] = "More uniform internal support can help tall parts behave better."
 
     # --- Stability adjustments (dimension-based fallback) ---
     if aspect >= 3.0:

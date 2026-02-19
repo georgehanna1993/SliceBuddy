@@ -1,68 +1,74 @@
 import json
+import os
 from core.state import PlanState
 from core.prompts import load_prompt
 from langchain_openai import ChatOpenAI
 
 
-def _render_stl_section(state: PlanState) -> str:
+def _render_model_checks_beginner(state: PlanState) -> str:
+    """
+    Beginner-friendly checks only:
+    - dimensions
+    - watertight status (simple)
+    - supports likely (simple)
+    - bed contact label (simple)
+    """
     stl = state.get("stl_features") or {}
     if not stl:
         return ""
 
     bbox = stl.get("bbox_mm")
     watertight = stl.get("watertight")
-    contact_area = stl.get("contact_area_mm2")
-    contact_ratio = stl.get("contact_ratio")
-    aspect = stl.get("aspect_ratio")
-    volume = stl.get("volume_mm3")
-    surface = stl.get("surface_area_mm2")
-    overhang_pct = stl.get("overhang_percent")
-    max_overhang = stl.get("max_overhang_deg")
     likely_supports = stl.get("likely_supports")
-    open_edges = stl.get("open_edges")
-    likely_open_top = stl.get("likely_open_top")
+
+    contact_area = float(stl.get("contact_area_mm2") or 0)
+    contact_ratio = float(stl.get("contact_ratio") or 0)
+
+    # Simple bed-contact label
+    if contact_area <= 0:
+        contact_label = "Unknown"
+    elif contact_area < 300 or contact_ratio < 0.15:
+        contact_label = "Very Low"
+    elif contact_area < 600 or contact_ratio < 0.30:
+        contact_label = "Low"
+    else:
+        contact_label = "Good"
 
     lines = []
-    lines.append("\n### Model Checks (from STL)")
-
+    lines.append("\n### Model Checks")
     if bbox:
         x, y, z = bbox
-        lines.append(f"- **Dimensions (mm)**: {x:.2f} × {y:.2f} × {z:.2f}")
-        lines.append(f"- **Height (mm)**: {z:.2f}")
-
+        lines.append(f"- **Size (mm)**: {x:.2f} × {y:.2f} × {z:.2f}")
     if watertight is not None:
-        lines.append(f"- **Watertight**: {'Yes' if watertight else 'No'}")
-
-    if likely_open_top is not None and not watertight:
-        lines.append(f"- **Likely open-top (intentional)**: {'Yes' if likely_open_top else 'No'}")
-
-    if open_edges is not None and not watertight:
-        lines.append(f"- **Open edges (boundary edge count)**: {int(open_edges)}")
-
-    if contact_area is not None:
-        lines.append(f"- **Estimated bed contact area (mm²)**: {float(contact_area):.2f}")
-
-    if contact_ratio is not None:
-        lines.append(f"- **Contact ratio (contact / bbox footprint)**: {float(contact_ratio):.3f}")
-
-    if aspect is not None:
-        lines.append(f"- **Aspect ratio (height / max(x,y))**: {float(aspect):.3f}")
-
-    if overhang_pct is not None:
-        lines.append(f"- **Overhang faces ≥ threshold (%)**: {float(overhang_pct):.2f}%")
-
-    if max_overhang is not None:
-        lines.append(f"- **Max overhang angle (deg)**: {float(max_overhang):.1f}")
-
+        lines.append(f"- **Mesh health**: {'OK' if watertight else 'Needs repair (open mesh)'}")
     if likely_supports is not None:
-        lines.append(f"- **Supports likely needed**: {'Yes' if likely_supports else 'No'}")
+        lines.append(f"- **Supports**: {'Likely needed' if likely_supports else 'Probably not needed'}")
+    lines.append(f"- **Bed contact**: {contact_label}")
 
-    if volume is not None:
-        lines.append(f"- **Volume (mm³)**: {float(volume):.2f}")
+    return "\n".join(lines)
 
-    if surface is not None:
-        lines.append(f"- **Surface area (mm²)**: {float(surface):.2f}")
 
+def _render_model_checks_tech(state: PlanState) -> str:
+    """
+    Optional: full technical dump (only when SHOW_TECH_DETAILS=true).
+    """
+    stl = state.get("stl_features") or {}
+    if not stl:
+        return ""
+
+    lines = []
+    lines.append("\n### Model Checks (technical)")
+    for k in [
+        "bbox_mm", "watertight", "is_volume",
+        "contact_area_mm2", "contact_ratio",
+        "aspect_ratio", "overhang_percent", "max_overhang_deg",
+        "boundary_edges", "nonmanifold_edges", "degenerate_faces",
+        "open_edges", "likely_open_top",
+        "volume_mm3", "surface_area_mm2",
+        "mesh_issue",
+    ]:
+        if k in stl:
+            lines.append(f"- **{k}**: {stl.get(k)}")
     return "\n".join(lines)
 
 
@@ -94,8 +100,13 @@ def explain_plan_llm_node(state: PlanState) -> PlanState:
 
     explanation = (resp.content or "").strip()
 
-    # Always append deterministic STL section
-    explanation += _render_stl_section(state)
+    # ✅ append beginner-friendly checks
+    explanation += _render_model_checks_beginner(state)
+
+    # ✅ optional technical dump
+    show_tech = os.getenv("SHOW_TECH_DETAILS", "false").lower() in ("1", "true", "yes")
+    if show_tech:
+        explanation += _render_model_checks_tech(state)
 
     state["plan_explanation"] = explanation
     return state

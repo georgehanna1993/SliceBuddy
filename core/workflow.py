@@ -13,6 +13,7 @@ from core.nodes.plan_orientation import plan_orientation_node
 from core.nodes.generate_slicer_settings import generate_slicer_settings_node
 from core.nodes.analyze_risks import analyze_risks_node
 from core.nodes.stl_analyze import stl_analyze_node
+from core.nodes.model_overview import model_overview_node
 
 # LLM-related nodes (optional)
 from core.nodes.explain_plan_llm import explain_plan_llm_node
@@ -54,6 +55,7 @@ def build_plan_app():
     graph.add_node("GENERATE_SLICER_SETTINGS", generate_slicer_settings_node)
     graph.add_node("ANALYZE_RISKS", analyze_risks_node)
     graph.add_node("DUMMY_PLAN", dummy_plan_node)
+    graph.add_node("MODEL_OVERVIEW", model_overview_node)
 
     if use_llm:
         graph.add_node("RAG_RETRIEVE", rag_retrieve_node)
@@ -76,7 +78,8 @@ def build_plan_app():
     )
 
     # Main deterministic chain
-    graph.add_edge("STL_ANALYZE", "NORMALIZE_INPUT")
+    graph.add_edge("STL_ANALYZE", "MODEL_OVERVIEW")
+    graph.add_edge("MODEL_OVERVIEW", "NORMALIZE_INPUT")
     graph.add_edge("NORMALIZE_INPUT", "SELECT_MATERIAL")
     graph.add_edge("SELECT_MATERIAL", "PLAN_ORIENTATION")
     graph.add_edge("PLAN_ORIENTATION", "GENERATE_SLICER_SETTINGS")

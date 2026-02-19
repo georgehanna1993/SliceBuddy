@@ -13,3 +13,14 @@ __pycache__/
 *.iml
 
 .chroma/
+
+# Next.js (root ignores)
+ui/node_modules/
+ui/.next/
+ui/out/
+
+# Local STL files (never commit)
+*.stl
+
+# Local scratch / experiments
+slicebuddy/
