@@ -20,7 +20,7 @@ from core.nodes.explain_plan_llm import explain_plan_llm_node
 from core.nodes.rag_retrieve import rag_retrieve_node
 
 
-def dummy_plan_node(state: PlanState) -> PlanState:
+def ASSEMBLE_PLAN_node(state: PlanState) -> PlanState:
     desc = state.get("description", "")
     h = state.get("height_mm", 0)
     w = state.get("width_mm", 0)
@@ -54,7 +54,7 @@ def build_plan_app():
     graph.add_node("PLAN_ORIENTATION", plan_orientation_node)
     graph.add_node("GENERATE_SLICER_SETTINGS", generate_slicer_settings_node)
     graph.add_node("ANALYZE_RISKS", analyze_risks_node)
-    graph.add_node("DUMMY_PLAN", dummy_plan_node)
+    graph.add_node("ASSEMBLE_PLAN", assemble_plan_node)
     graph.add_node("MODEL_OVERVIEW", model_overview_node)
 
     if use_llm:
@@ -84,14 +84,14 @@ def build_plan_app():
     graph.add_edge("SELECT_MATERIAL", "PLAN_ORIENTATION")
     graph.add_edge("PLAN_ORIENTATION", "GENERATE_SLICER_SETTINGS")
     graph.add_edge("GENERATE_SLICER_SETTINGS", "ANALYZE_RISKS")
-    graph.add_edge("ANALYZE_RISKS", "DUMMY_PLAN")
+    graph.add_edge("ANALYZE_RISKS", "ASSEMBLE_PLAN")
 
     # LLM path
     if use_llm:
-        graph.add_edge("DUMMY_PLAN", "RAG_RETRIEVE")
+        graph.add_edge("ASSEMBLE_PLAN", "RAG_RETRIEVE")
         graph.add_edge("RAG_RETRIEVE", "EXPLAIN_PLAN")
         graph.add_edge("EXPLAIN_PLAN", END)
     else:
-        graph.add_edge("DUMMY_PLAN", END)
+        graph.add_edge("ASSEMBLE_PLAN", END)
 
     return graph.compile()
