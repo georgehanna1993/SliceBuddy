@@ -54,16 +54,25 @@ function supportsLabel(payload: any) {
 
   if (stl?.likely_supports === true) return "Yes (likely needed)";
   if (supports) {
-    if (supports.toLowerCase().includes("on")) return "Yes";
-    if (supports.toLowerCase().includes("auto")) return "Auto (only if needed)";
-    if (supports.toLowerCase().includes("off")) return "No";
+    const s = supports.toLowerCase();
+    if (s.includes("on")) return "Yes";
+    if (s.includes("auto")) return "Auto (only if needed)";
+    if (s.includes("off")) return "No";
   }
   return "Auto (only if needed)";
 }
 
 function infillTypeOrSuggestion(payload: any) {
   const slicer = payload?.plan?.slicer_settings?.settings || payload?.slicer_settings?.settings || {};
-  const t = slicer.infill_type || slicer.infill_pattern;
+
+  // Try a few common keys (you’ll probably standardize later)
+  const t =
+    slicer.infill_type ||
+    slicer.infill_pattern ||
+    slicer.infillPattern ||
+    slicer.infill ||
+    slicer["infill_type"];
+
   return t ? safeStr(t) : "Gyroid (good all-rounder)";
 }
 
@@ -74,6 +83,68 @@ function fmtDims(payload: any) {
   const [x, y, z] = bbox.map((n: any) => Number(n));
   if (![x, y, z].every((n: number) => Number.isFinite(n))) return null;
   return `${x.toFixed(1)} × ${y.toFixed(1)} × ${z.toFixed(1)} mm`;
+}
+
+/**
+ * Make a friendly, non-echoey overview based on keywords.
+ * Goal: "Maybe it's a …" + practical print implications.
+ * This is ONLY used if backend didn’t provide model_overview.
+ */
+function guessOverviewFromDescription(descRaw: string, supports: string, bedLabel: string, stl: any) {
+  const desc = (descRaw || "").toLowerCase();
+
+  let guess = "a general 3D model";
+  let useCaseHint = "";
+  let printHint = "";
+
+  // Broad categories
+  const isContainer = /box|tray|bin|case|organizer|container|holder/.test(desc);
+  const isFidget = /fidget|twist|spinner|cube|worry|click/.test(desc);
+  const isToy = /toy|ball|game|kid|kids|play/.test(desc);
+  const isFunctional = /bracket|mount|clip|adapter|hinge|tool|stand|hook/.test(desc);
+  const isDecor = /decor|ornament|statue|figurine|vase|art/.test(desc);
+
+  if (isFidget) guess = "a fidget / tactile toy";
+  else if (isContainer) guess = "a small container / organizer";
+  else if (isFunctional) guess = "a functional part";
+  else if (isDecor) guess = "a decorative print";
+  else if (isToy) guess = "a toy or play object";
+
+  if (isContainer) useCaseHint = "Likely meant to hold small items (screws, parts, desk stuff).";
+  if (isFidget) useCaseHint = "Probably meant to be handled a lot, so smoothness matters.";
+  if (isFunctional) useCaseHint = "Strength and layer adhesion matter more than looks here.";
+  if (isDecor) useCaseHint = "Looks matter most; strength usually matters less.";
+
+  // Mesh health note (beginner friendly)
+  const meshNote =
+    stl && stl.watertight === false
+      ? "Mesh has openings/holes, so repairing the STL is recommended before printing."
+      : "";
+
+  // Practical hint based on supports + bed contact labels
+  const supportsNeeded = supports.toLowerCase().includes("yes");
+  if (supportsNeeded) {
+    printHint = "Supports are likely needed due to overhangs—expect extra cleanup after printing.";
+  } else {
+    printHint = "Supports probably aren’t needed in this orientation, which keeps the print cleaner.";
+  }
+
+  if (bedLabel.toLowerCase().includes("very low")) {
+    printHint += " Bed contact looks weak—consider a brim or re-orienting for better adhesion.";
+  } else if (bedLabel.toLowerCase().includes("low")) {
+    printHint += " Bed contact is a bit low—brim can help if you see lifting.";
+  } else if (bedLabel.toLowerCase().includes("good")) {
+    printHint += " Bed contact looks good—should be stable on the plate.";
+  }
+
+  const pieces = [
+    `Maybe this is ${guess}.`,
+    useCaseHint,
+    printHint,
+    meshNote,
+  ].filter(Boolean);
+
+  return pieces.join(" ");
 }
 
 export default function Page() {
@@ -117,6 +188,7 @@ export default function Page() {
   }
 
   function pickFile() {
+    if (isSending) return;
     fileInputRef.current?.click();
   }
 
@@ -126,6 +198,7 @@ export default function Page() {
   }
 
   function clearComposer() {
+    if (isSending) return;
     setUseText("");
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -190,11 +263,21 @@ export default function Page() {
       popLoading();
 
       if (!resp.ok) {
-        pushBotText(`Server error (${resp.status}). Check FastAPI logs.`);
+        let bodyText = "";
+        try {
+          bodyText = await resp.text();
+        } catch {}
+        pushBotText(`Server error (${resp.status}). ${bodyText ? bodyText.slice(0, 180) : "Check FastAPI logs."}`);
         return;
       }
 
       const data = await resp.json();
+
+      // If backend ever returns a stop message
+      if (data?.stop && data?.plan_explanation) {
+        pushBotText(safeStr(data.plan_explanation));
+        return;
+      }
 
       // Instead of dumping markdown, render structured “plan cards”
       setMessages((prev) => [
@@ -204,9 +287,9 @@ export default function Page() {
 
       setUseText("");
       // keep file selected
-    } catch (e) {
+    } catch (e: any) {
       popLoading();
-      pushBotText("Something went wrong while generating the plan.");
+      pushBotText(`Something went wrong while generating the plan. ${safeStr(e?.message)}`);
     } finally {
       setIsSending(false);
     }
@@ -231,7 +314,7 @@ export default function Page() {
             </div>
           </div>
 
-          <button className="sb-newBtn" onClick={newPlan}>
+          <button className="sb-newBtn" onClick={newPlan} disabled={isSending}>
             + New Print Plan
           </button>
 
@@ -249,6 +332,7 @@ export default function Page() {
                   key={p.id}
                   className={`sb-planItem ${p.id === activePlanId ? "active" : ""}`}
                   onClick={() => setActivePlanId(p.id)}
+                  disabled={isSending}
                 >
                   <div className="sb-planTitle">{p.title}</div>
                   <div className="sb-planMeta">{timeAgo(p.createdAt)}</div>
@@ -292,9 +376,7 @@ export default function Page() {
                   )}
 
                   {/* plan cards */}
-                  {m.kind === "plan" && m.role === "bot" && (
-                    <PlanCards payload={m.planPayload} />
-                  )}
+                  {m.kind === "plan" && m.role === "bot" && <PlanCards payload={m.planPayload} />}
                 </div>
               </div>
             ))}
@@ -313,7 +395,7 @@ export default function Page() {
           />
 
           <div className="sb-composer">
-            <button className="sb-plusBtn" onClick={pickFile} title="Choose STL">
+            <button className="sb-plusBtn" onClick={pickFile} title="Choose STL" disabled={isSending}>
               +
             </button>
 
@@ -322,6 +404,7 @@ export default function Page() {
                 className="sb-input"
                 placeholder="What is this model used for? (e.g., open-top box for screws)"
                 value={useText}
+                disabled={isSending}
                 onChange={(e) => setUseText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") send();
@@ -332,7 +415,7 @@ export default function Page() {
               </div>
             </div>
 
-            <button className="sb-clearBtn" onClick={clearComposer}>
+            <button className="sb-clearBtn" onClick={clearComposer} disabled={isSending}>
               Clear
             </button>
 
@@ -345,9 +428,7 @@ export default function Page() {
             </button>
           </div>
 
-          <div className="sb-footnote">
-            Requirement: upload an STL + describe what it’s used for.
-          </div>
+          <div className="sb-footnote">Requirement: upload an STL + describe what it’s used for.</div>
         </footer>
       </main>
 
@@ -424,6 +505,7 @@ export default function Page() {
           font-weight: 700;
           cursor: pointer;
         }
+        .sb-newBtn:disabled{ opacity: 0.7; cursor: not-allowed; }
 
         .sb-newBtn:hover{ border-color: rgba(0,0,0,0.16); }
 
@@ -456,6 +538,7 @@ export default function Page() {
           background: #fff;
           cursor: pointer;
         }
+        .sb-planItem:disabled{ opacity: 0.7; cursor: not-allowed; }
 
         .sb-planItem.active{
           border-color: rgba(63,174,88,0.65);
@@ -569,6 +652,7 @@ export default function Page() {
           cursor: pointer;
           box-shadow: 0 2px 0 rgba(0,0,0,0.12);
         }
+        .sb-plusBtn:disabled{ opacity: 0.75; cursor: not-allowed; }
 
         .sb-inputWrap{
           display: flex;
@@ -586,6 +670,7 @@ export default function Page() {
           outline: none;
           background: #fff;
         }
+        .sb-input:disabled{ opacity: 0.85; }
 
         .sb-fileHint{
           font-size: 13px;
@@ -604,6 +689,7 @@ export default function Page() {
           cursor: pointer;
           box-shadow: 0 2px 0 rgba(0,0,0,0.12);
         }
+        .sb-clearBtn:disabled{ opacity: 0.75; cursor: not-allowed; }
 
         .sb-sendBtn{
           border: none;
@@ -662,12 +748,23 @@ function PlanCards({ payload }: { payload: any }) {
   const bed = bedContactLabel(stl);
   const supports = supportsLabel(payload);
 
-  // THIS is the “overview” you wanted:
-  // We prefer backend-generated `model_overview` if you have it, otherwise a decent fallback.
-  const overview =
+  // Prefer backend overview if available.
+  // If not, generate a "Maybe it's..." overview WITHOUT echoing the user text.
+  const backendOverview =
     safeStr(payload?.model_overview).trim() ||
     safeStr(plan?.model_overview).trim() ||
-    `This looks like a ${safeStr(payload?.input_norm?.description || payload?.description || "model")} with ${supports.toLowerCase().includes("yes") ? "some overhangs" : "no major overhangs"} and ${bed.label.toLowerCase()} bed contact.`;
+    "";
+
+  // best-effort description source (doesn't have to be the user's raw text)
+  const descSource =
+    safeStr(payload?.input_norm?.description) ||
+    safeStr(payload?.description) ||
+    safeStr(plan?.summary) ||
+    "";
+
+  const overview =
+    backendOverview ||
+    guessOverviewFromDescription(descSource, supports, bed.label, stl);
 
   const warningsList: { severity: string; why: string }[] =
     risks?.items?.map((r: any) => ({ severity: safeStr(r.severity), why: safeStr(r.why) })) || [];
@@ -723,9 +820,7 @@ function PlanCards({ payload }: { payload: any }) {
         <Card title="🧲 Bed Adhesion" subtitle="Stick it to the plate (peacefully)">
           <KV k="Bed contact" v={bed.label} />
           <KV k="Brim" v={`${Number(slicer?.brim_mm || 0)} mm`} />
-          <div className="sb-hint">
-            Tip: clean bed + slow first layer usually beats “praying harder”.
-          </div>
+          <div className="sb-hint">Tip: clean bed + slow first layer usually beats “praying harder”.</div>
         </Card>
 
         <Card title="💪 Strength" subtitle="Walls / top-bottom / infill">
@@ -737,7 +832,10 @@ function PlanCards({ payload }: { payload: any }) {
 
         <Card title="⚙️ Quality" subtitle="General print quality defaults">
           <KV k="Layer height" v={`${Number(slicer?.layer_height_mm ?? 0.2)} mm`} />
-          <KV k="Notes" v={Array.isArray(slicer?.notes) ? slicer.notes.join(" • ") : safeStr(slicer?.notes || "")} />
+          <KV
+            k="Notes"
+            v={Array.isArray(slicer?.notes) ? slicer.notes.join(" • ") : safeStr(slicer?.notes || "")}
+          />
         </Card>
       </div>
 

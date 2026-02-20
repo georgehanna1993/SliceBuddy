@@ -24,3 +24,11 @@ ui/out/
 
 # Local scratch / experiments
 slicebuddy/
+
+# Node / Next
+ui/.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# STL test files
