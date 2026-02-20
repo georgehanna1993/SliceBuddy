@@ -54,7 +54,7 @@ def build_plan_app():
     graph.add_node("PLAN_ORIENTATION", plan_orientation_node)
     graph.add_node("GENERATE_SLICER_SETTINGS", generate_slicer_settings_node)
     graph.add_node("ANALYZE_RISKS", analyze_risks_node)
-    graph.add_node("ASSEMBLE_PLAN", assemble_plan_node)
+    graph.add_node("ASSEMBLE_PLAN", ASSEMBLE_PLAN_node)
     graph.add_node("MODEL_OVERVIEW", model_overview_node)
 
     if use_llm:

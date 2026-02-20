@@ -23,24 +23,20 @@ SliceBuddy focuses on planning, not model generation.
 
 ---
 
+## 🚀 UI
+![SliceBuddy UI](docs/images/UI1.png)
+![SliceBuddy UI](docs/images/UI2.png)
+---
+
 ## 🧠 How It Works
 
 SliceBuddy uses a deterministic multi-step workflow built with **LangGraph**.
 
 ### Workflow
 
-```
-Intent Guard
-→ STL Analyze
-→ Model Overview
-→ Normalize Input
-→ Select Material
-→ Plan Orientation
-→ Generate Slicer Settings
-→ Analyze Risks
-→ RAG Retrieval
-→ LLM Explanation
-```
+## 🗺️ Workflow
+
+![SliceBuddy Workflow](docs/images/workflow.png)
 
 Logic is rule-based where possible.  
 The LLM is used only for explanation, not decision-making.
