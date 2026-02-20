@@ -24,8 +24,8 @@ SliceBuddy focuses on planning, not model generation.
 ---
 
 ## 🚀 UI
-![SliceBuddy UI](docs/images/UI1.png)
-![SliceBuddy UI](docs/images/UI2.png)
+![SliceBuddy UI](docs/images/u1.png)
+![SliceBuddy UI](docs/images/u2.png)
 ---
 
 ## 🧠 How It Works
