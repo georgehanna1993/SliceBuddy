@@ -31,8 +31,7 @@ SliceBuddy focuses on planning, not model generation.
 ## 🧠 How It Works
 
 SliceBuddy uses a deterministic multi-step workflow built with **LangGraph**.
-
-### Workflow
+---
 
 ## 🗺️ Workflow
 
