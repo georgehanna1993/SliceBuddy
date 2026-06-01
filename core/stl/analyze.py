@@ -179,11 +179,28 @@ def _mesh_issue_summary(watertight: bool, is_volume: bool, boundary_edges: int, 
 
 
 def analyze_stl(path: str) -> Dict[str, Any]:
-    mesh = trimesh.load(path, force="mesh")
+    try:
+        mesh = trimesh.load(path, force="mesh")
+    except Exception as exc:
+        raise ValueError("the file is not a readable STL mesh") from exc
+
     if isinstance(mesh, trimesh.Scene):
-        mesh = trimesh.util.concatenate([g for g in mesh.geometry.values()])
+        geometries = list(mesh.geometry.values())
+        if not geometries:
+            raise ValueError("the STL does not contain any geometry")
+        mesh = trimesh.util.concatenate(geometries)
+
+    if not isinstance(mesh, trimesh.Trimesh):
+        raise ValueError("the STL did not load as a triangle mesh")
+    if mesh.vertices is None or len(mesh.vertices) == 0:
+        raise ValueError("the STL does not contain any vertices")
+    if mesh.faces is None or len(mesh.faces) == 0:
+        raise ValueError("the STL does not contain any triangle faces")
 
     x, y, z = [float(v) for v in mesh.extents]
+    if not np.isfinite([x, y, z]).all() or min(x, y, z) <= 0:
+        raise ValueError("the STL has invalid or zero-sized dimensions")
+
     footprint_bbox = float(x * y)
 
     height = float(z)

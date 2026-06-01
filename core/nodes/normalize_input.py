@@ -22,6 +22,7 @@ def normalize_input_node(state: PlanState) -> PlanState:
         "description": state.get("description"),
         "height_mm": state.get("height_mm"),
         "width_mm": state.get("width_mm"),
+        "planning_context": state.get("planning_context", {}),
     }
 
     # ---- Normalize description ----
@@ -77,6 +78,7 @@ def normalize_input_node(state: PlanState) -> PlanState:
         "description": desc,
         "height_mm": round(h, 2),
         "width_mm": round(w, 2),
+        "planning_context": state.get("planning_context", {}) or {},
     }
 
     state["input_raw"] = input_raw

@@ -7,6 +7,10 @@ It analyzes an STL file and usage description, then produces a structured, pract
 
 SliceBuddy focuses on planning, not model generation.
 
+Before generating recommendations, SliceBuddy asks a few quick deterministic
+questions about environment, purpose, and expected load. These answers help it
+avoid treating a decorative indoor print like an outdoor or automotive part.
+
 ---
 
 ## 🚀 Features
@@ -16,7 +20,8 @@ SliceBuddy focuses on planning, not model generation.
 - Orientation planning
 - Slicer settings generation (walls, infill, supports, brim)
 - Print risk detection with mitigations
-- RAG knowledge grounding (Chroma + Markdown KB)
+- Guided clarification for environment, purpose, and expected load
+- Optional RAG knowledge grounding (Chroma + Markdown KB)
 - FastAPI backend
 - CLI interface
 - Structured JSON output + human-readable explanation
@@ -63,7 +68,7 @@ app/
   main.py                # FastAPI entrypoint
 
 core/
-  node/                  # LangGraph workflow nodes
+  nodes/                 # LangGraph workflow nodes
   rag/                   # RAG + Chroma integration
   stl/                   # STL analysis engine
 
@@ -134,6 +139,12 @@ Start the server:
 uvicorn app.main:app --reload
 ```
 
+Check that it is healthy:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
 Send a POST request to `/plan` with:
 
 - `use` (form field)
@@ -162,7 +173,8 @@ Knowledge source:
 knowledge/3d_printing_knowledge_base.md
 ```
 
-Build the vector index:
+The deterministic planner works without OpenAI or Chroma. To enable AI explanations,
+set `USE_LLM_EXPLAINER=true`, add an OpenAI API key, and build the vector index:
 
 ```bash
 python scripts/build_index.py
@@ -192,11 +204,42 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Set your OpenAI key:
+Create your local environment file:
 
 ```bash
-export OPENAI_API_KEY=your_key_here   # Mac/Linux
-set OPENAI_API_KEY=your_key_here      # Windows
+cp .env.example .env
+```
+
+The default configuration runs locally without an OpenAI key. Edit `.env` if you
+want to enable optional AI explanations or change the upload limit and CORS origins.
+
+Start the frontend:
+
+```bash
+cd ui
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+---
+
+## ✅ Verification
+
+Run the backend test suite:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Run the frontend checks:
+
+```bash
+cd ui
+npm run lint
+npm run build
 ```
 
 ---

@@ -22,11 +22,9 @@ ui/out/
 # Local STL files (never commit)
 *.stl
 
-# Local scratch / experiments
-slicebuddy/
-
 # Node / Next
 ui/.env*
+!ui/.env.example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

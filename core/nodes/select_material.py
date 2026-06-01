@@ -9,6 +9,10 @@ def select_material_node(state: PlanState) -> PlanState:
     """
     norm = state.get("input_norm", {})
     desc: str = (norm.get("description") or "").lower()
+    context = norm.get("planning_context", {}) or {}
+    environment = str(context.get("environment", "")).lower()
+    purpose = str(context.get("purpose", "")).lower()
+    load = str(context.get("load", "")).lower()
 
     warnings: List[str] = state.get("warnings", [])
     assumptions: List[str] = state.get("assumptions", [])
@@ -26,16 +30,16 @@ def select_material_node(state: PlanState) -> PlanState:
     alternatives = ["PETG"]
 
     # --- TPU (flexible) ---
-    if has_any(["tpu", "flex", "flexible", "rubber", "gasket", "seal", "phone case", "bumper"]):
+    if purpose == "flexible" or has_any(["tpu", "flex", "flexible", "rubber", "gasket", "seal", "phone case", "bumper"]):
         material = "TPU"
         reason = "Description suggests flexibility/elasticity. TPU is the go-to flexible filament."
         alternatives = ["PETG (semi-flex depending on part)", "PLA (not flexible)"]
         assumptions.append("Assuming you want a flexible part based on description keywords.")
 
     # --- Outdoor / UV / weather resistance → ASA ---
-    elif has_any(["outdoor", "sun", "uv", "weather", "rain", "garden", "car", "roof"]):
+    elif environment in {"outdoor", "car_interior", "car_or_engine"} or has_any(["outdoor", "sun", "uv", "weather", "rain", "garden", "car", "roof"]):
         material = "ASA"
-        reason = "Outdoor/UV exposure suggested. ASA is preferred for UV and weather resistance."
+        reason = "Sunlight, weather, or vehicle heat exposure is possible. ASA is preferred for UV and heat resistance."
         alternatives = ["PETG", "ABS"]
         warnings.append("ASA/ABS typically prints best with an enclosure and good ventilation.")
 
@@ -48,7 +52,12 @@ def select_material_node(state: PlanState) -> PlanState:
 
     # --- Tall print strength / general functional part → PETG ---
     else:
-        if height >= 120:
+        if purpose == "functional" or load in {"moderate", "high"}:
+            material = "PETG"
+            reason = "Functional use or regular load is expected. PETG is tougher than PLA and has better layer adhesion."
+            alternatives = ["PLA", "ASA"]
+
+        elif height >= 120:
             material = "PETG"
             reason = "Taller prints often benefit from PETG's improved toughness and layer adhesion."
             alternatives = ["PLA", "ASA"]
@@ -66,6 +75,9 @@ def select_material_node(state: PlanState) -> PlanState:
             "keyword_based": bool(desc),
             "height_mm": height,
             "width_mm": width,
+            "environment": environment,
+            "purpose": purpose,
+            "load": load,
         },
     }
 

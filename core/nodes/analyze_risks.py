@@ -16,6 +16,9 @@ def analyze_risks_node(state: PlanState) -> PlanState:
     assumptions: List[str] = state.get("assumptions", []) or []
 
     desc = (norm.get("description") or "").lower()
+    context = norm.get("planning_context", {}) or {}
+    environment = str(context.get("environment", "")).lower()
+    load = str(context.get("load", "")).lower()
     h = float(norm.get("height_mm", 0) or 0)
     w = float(norm.get("width_mm", 0) or 0)
     aspect = (h / w) if (h > 0 and w > 0) else 0.0
@@ -52,6 +55,18 @@ def analyze_risks_node(state: PlanState) -> PlanState:
         risks.append({"id": risk_id, "severity": severity, "why": why})
         if fix:
             mitigations.append(fix)
+
+    # ------------------------------------------------------------
+    # 0) Suitability warning for demanding applications
+    # ------------------------------------------------------------
+    if load == "high" or environment == "car_or_engine":
+        add_risk(
+            "validate_critical_part",
+            "high",
+            "This part may experience high load or automotive heat. A print plan alone cannot certify it as safe.",
+            "Use an appropriate engineering review, test the printed part under realistic conditions, and do not rely on it for safety-critical use.",
+        )
+        add_warning_once("Safety-critical or automotive parts require physical validation before use.")
 
     # ------------------------------------------------------------
     # 1) Mesh integrity risk (SMART)

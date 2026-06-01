@@ -18,6 +18,9 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
     assumptions: List[str] = state.get("assumptions", [])
 
     desc = (norm.get("description") or "").lower()
+    context = norm.get("planning_context", {}) or {}
+    purpose = str(context.get("purpose", "")).lower()
+    load = str(context.get("load", "")).lower()
     h = float(norm.get("height_mm", 0) or 0)
     w = float(norm.get("width_mm", 0) or 0)
     aspect = (h / w) if (h > 0 and w > 0) else 0.0
@@ -102,6 +105,8 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
     if used_stl and likely_supports:
         settings["supports"] = "on (STL overhang detected)"
         warnings.append("STL overhang detected. Supports likely needed.")
+    elif used_stl:
+        settings["supports"] = "off (STL geometry checked)"
 
     # --- Keyword-based support hints (user text) ---
     # If the user explicitly says overhang/cantilever/bridge, we force supports on.
@@ -124,12 +129,21 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         warnings.append("Pointy base contact detected. Consider changing orientation or adding a raft/brim.")
 
     # --- Strength hints ---
-    if any(k in desc for k in ["functional", "bracket", "mount", "holder", "clip"]):
+    if purpose == "functional" or any(k in desc for k in ["functional", "bracket", "mount", "holder", "clip"]):
         settings["walls"] = max(settings["walls"], 4)
         settings["infill_percent"] = max(settings["infill_percent"], 20)
         settings["notes"].append("Functional part: increased walls/infill for strength.")
 
-    if any(k in desc for k in ["figurine", "statue", "decor", "ornament"]):
+    if load == "high":
+        settings["walls"] = max(settings["walls"], 5)
+        settings["infill_percent"] = max(settings["infill_percent"], 40)
+        settings["notes"].append("High load: increased walls/infill. Validate with a physical test before relying on the part.")
+    elif load == "moderate":
+        settings["walls"] = max(settings["walls"], 4)
+        settings["infill_percent"] = max(settings["infill_percent"], 30)
+        settings["notes"].append("Regular functional load: increased walls/infill.")
+
+    if purpose == "decorative" or any(k in desc for k in ["figurine", "statue", "decor", "ornament"]):
         settings["infill_percent"] = min(settings["infill_percent"], 12)
         settings["notes"].append("Decorative part: lower infill usually fine.")
 

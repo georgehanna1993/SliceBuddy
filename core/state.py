@@ -6,6 +6,7 @@ class PlanState(TypedDict, total=False):
     description: str
     height_mm: float
     width_mm: float
+    planning_context: Dict[str, str]
 
     # STL input (optional)
     stl_path: str
@@ -13,6 +14,8 @@ class PlanState(TypedDict, total=False):
 
     # --- Control flags ---
     stop: bool
+    needs_clarification: bool
+    clarification_questions: List[Dict[str, Any]]
 
     # --- Normalized/validated inputs ---
     input_raw: Dict[str, Any]

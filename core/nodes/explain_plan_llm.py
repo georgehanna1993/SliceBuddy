@@ -1,6 +1,7 @@
 import json
 import os
 from core.state import PlanState
+from core.nodes.explain_plan import explain_plan_node
 from core.prompts import load_prompt
 from langchain_openai import ChatOpenAI
 
@@ -73,6 +74,9 @@ def _render_model_checks_tech(state: PlanState) -> str:
 
 
 def explain_plan_llm_node(state: PlanState) -> PlanState:
+    if not os.getenv("OPENAI_API_KEY"):
+        return _fallback_to_local_explanation(state)
+
     system_prompt = load_prompt("system/base_system.txt")
     template = load_prompt("templates/explain_plan.txt")
 
@@ -91,12 +95,15 @@ def explain_plan_llm_node(state: PlanState) -> PlanState:
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
 
-    resp = llm.invoke(
-        [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-    )
+    try:
+        resp = llm.invoke(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+        )
+    except Exception:
+        return _fallback_to_local_explanation(state)
 
     explanation = (resp.content or "").strip()
 
@@ -110,3 +117,12 @@ def explain_plan_llm_node(state: PlanState) -> PlanState:
 
     state["plan_explanation"] = explanation
     return state
+
+
+def _fallback_to_local_explanation(state: PlanState) -> PlanState:
+    warnings = state.get("warnings", []) or []
+    warning = "AI explanation is unavailable. Showing the deterministic print plan."
+    if warning not in warnings:
+        warnings.append(warning)
+    state["warnings"] = warnings
+    return explain_plan_node(state)

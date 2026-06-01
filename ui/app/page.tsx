@@ -9,7 +9,7 @@ type ChatMsg = {
   role: "user" | "bot";
   text?: string; // plain text (user messages)
   kind?: "text" | "plan" | "loading";
-  planPayload?: any; // raw API response
+  planPayload?: PlanPayload;
 };
 
 type PlanItem = {
@@ -18,7 +18,96 @@ type PlanItem = {
   createdAt: number;
 };
 
-function safeStr(v: any): string {
+type STLFeatures = {
+  bbox_mm?: number[];
+  contact_area_mm2?: number;
+  contact_ratio?: number;
+  likely_supports?: boolean;
+  watertight?: boolean;
+};
+
+type SlicerSettings = {
+  supports?: string;
+  infill_type?: string;
+  infill_pattern?: string;
+  infillPattern?: string;
+  infill?: string | number;
+  "infill%"?: number;
+  infill_percent?: number;
+  brim_mm?: number;
+  walls?: number;
+  top_bottom_layers?: number;
+  topBottom?: number;
+  layer_height_mm?: number;
+  notes?: string[] | string;
+};
+
+type RiskItem = {
+  severity?: string;
+  why?: string;
+};
+
+type PrintPlan = {
+  summary?: string;
+  model_overview?: string;
+  explanation?: string;
+  material?: {
+    recommended?: string;
+    reason?: string;
+    alternatives?: string[];
+  };
+  orientation?: {
+    recommended?: string;
+    reason?: string;
+    tradeoffs?: string[];
+  };
+  slicer_settings?: {
+    settings?: SlicerSettings;
+  };
+  risks?: {
+    items?: RiskItem[];
+  };
+};
+
+type PlanPayload = {
+  model_overview?: string;
+  description?: string;
+  warnings?: string[];
+  plan_explanation?: string;
+  stl_features?: STLFeatures;
+  material?: PrintPlan["material"];
+  orientation?: PrintPlan["orientation"];
+  input_norm?: {
+    description?: string;
+  };
+  slicer_settings?: {
+    settings?: SlicerSettings;
+  };
+  risks?: {
+    items?: RiskItem[];
+  };
+  plan?: PrintPlan;
+  needs_clarification?: boolean;
+  clarification_questions?: ClarificationQuestion[];
+};
+
+type ClarificationOption = {
+  value: string;
+  label: string;
+};
+
+type ClarificationQuestion = {
+  id: string;
+  question: string;
+  options: ClarificationOption[];
+};
+
+type PlanningContext = Record<string, string>;
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const MAX_STL_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+function safeStr(v: unknown): string {
   if (v === null || v === undefined) return "";
   return String(v);
 }
@@ -36,18 +125,19 @@ function severityLabel(s: string) {
   return { tag: "LOW", cls: "sb-sevLow" };
 }
 
-function bedContactLabel(stl: any) {
+function bedContactLabel(stl?: STLFeatures) {
   if (!stl) return { label: "Unknown", tone: "muted" as const };
   const area = Number(stl.contact_area_mm2 || 0);
   const ratio = Number(stl.contact_ratio || 0);
 
   // same logic you used in CLI but hidden behind “labels”
+  if (area <= 0) return { label: "Unknown", tone: "muted" as const };
   if (area > 0 && (area < 300 || ratio < 0.15)) return { label: "Very low", tone: "bad" as const };
   if (area > 0 && (area < 600 || ratio < 0.3)) return { label: "Low", tone: "warn" as const };
   return { label: "Good", tone: "good" as const };
 }
 
-function supportsLabel(payload: any) {
+function supportsLabel(payload?: PlanPayload) {
   const stl = payload?.stl_features;
   const slicer = payload?.plan?.slicer_settings?.settings || payload?.slicer_settings?.settings || {};
   const supports = safeStr(slicer.supports);
@@ -62,7 +152,7 @@ function supportsLabel(payload: any) {
   return "Auto (only if needed)";
 }
 
-function infillTypeOrSuggestion(payload: any) {
+function infillTypeOrSuggestion(payload?: PlanPayload) {
   const slicer = payload?.plan?.slicer_settings?.settings || payload?.slicer_settings?.settings || {};
 
   // Try a few common keys (you’ll probably standardize later)
@@ -76,11 +166,11 @@ function infillTypeOrSuggestion(payload: any) {
   return t ? safeStr(t) : "Gyroid (good all-rounder)";
 }
 
-function fmtDims(payload: any) {
+function fmtDims(payload?: PlanPayload) {
   const stl = payload?.stl_features;
   const bbox = stl?.bbox_mm;
   if (!bbox || !Array.isArray(bbox) || bbox.length !== 3) return null;
-  const [x, y, z] = bbox.map((n: any) => Number(n));
+  const [x, y, z] = bbox.map((n) => Number(n));
   if (![x, y, z].every((n: number) => Number.isFinite(n))) return null;
   return `${x.toFixed(1)} × ${y.toFixed(1)} × ${z.toFixed(1)} mm`;
 }
@@ -90,7 +180,7 @@ function fmtDims(payload: any) {
  * Goal: "Maybe it's a …" + practical print implications.
  * This is ONLY used if backend didn’t provide model_overview.
  */
-function guessOverviewFromDescription(descRaw: string, supports: string, bedLabel: string, stl: any) {
+function guessOverviewFromDescription(descRaw: string, supports: string, bedLabel: string, stl?: STLFeatures) {
   const desc = (descRaw || "").toLowerCase();
 
   let guess = "a general 3D model";
@@ -158,6 +248,8 @@ export default function Page() {
   const [useText, setUseText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [planningContext, setPlanningContext] = useState<PlanningContext>({});
+  const [clarificationQuestions, setClarificationQuestions] = useState<ClarificationQuestion[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -184,6 +276,8 @@ export default function Page() {
     ]);
     setUseText("");
     setSelectedFile(null);
+    setPlanningContext({});
+    setClarificationQuestions([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -194,6 +288,18 @@ export default function Page() {
 
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
+    if (f && !f.name.toLowerCase().endsWith(".stl")) {
+      pushBotText("Please choose a file ending in .stl.");
+      e.target.value = "";
+      setSelectedFile(null);
+      return;
+    }
+    if (f && f.size > MAX_STL_UPLOAD_BYTES) {
+      pushBotText("That STL is larger than the 25 MB upload limit.");
+      e.target.value = "";
+      setSelectedFile(null);
+      return;
+    }
     setSelectedFile(f);
   }
 
@@ -201,6 +307,8 @@ export default function Page() {
     if (isSending) return;
     setUseText("");
     setSelectedFile(null);
+    setPlanningContext({});
+    setClarificationQuestions([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -216,7 +324,7 @@ export default function Page() {
     setMessages((prev) => prev.filter((m) => m.kind !== "loading"));
   }
 
-  async function send() {
+  async function send(includeUserMessage = true) {
     const trimmed = useText.trim();
     if (!selectedFile) {
       pushBotText("Please choose an STL first (tap the +).");
@@ -229,7 +337,9 @@ export default function Page() {
     if (isSending) return;
 
     // Add the user message ONCE
-    setMessages((prev) => [...prev, { role: "user", kind: "text", text: trimmed }]);
+    if (includeUserMessage) {
+      setMessages((prev) => [...prev, { role: "user", kind: "text", text: trimmed }]);
+    }
 
     // Ensure we have a plan item + nice title
     if (!activePlanId) {
@@ -254,8 +364,9 @@ export default function Page() {
       const fd = new FormData();
       fd.append("use", trimmed);
       fd.append("stl", selectedFile);
+      fd.append("planning_context", JSON.stringify(planningContext));
 
-      const resp = await fetch("http://127.0.0.1:8000/plan", {
+      const resp = await fetch(`${API_BASE_URL}/plan`, {
         method: "POST",
         body: fd,
       });
@@ -265,13 +376,23 @@ export default function Page() {
       if (!resp.ok) {
         let bodyText = "";
         try {
-          bodyText = await resp.text();
+          const body = await resp.json();
+          bodyText = safeStr(body?.detail);
         } catch {}
-        pushBotText(`Server error (${resp.status}). ${bodyText ? bodyText.slice(0, 180) : "Check FastAPI logs."}`);
+        pushBotText(bodyText || `Server error (${resp.status}). Check the SliceBuddy API logs.`);
         return;
       }
 
       const data = await resp.json();
+
+      if (data?.needs_clarification && Array.isArray(data?.clarification_questions)) {
+        setClarificationQuestions(data.clarification_questions);
+        pushBotText(
+          safeStr(data.plan_explanation) ||
+          "I analyzed the STL. Answer these quick questions so I can tailor the plan."
+        );
+        return;
+      }
 
       // If backend ever returns a stop message
       if (data?.stop && data?.plan_explanation) {
@@ -286,10 +407,12 @@ export default function Page() {
       ]);
 
       setUseText("");
+      setClarificationQuestions([]);
       // keep file selected
-    } catch (e: any) {
+    } catch (e: unknown) {
       popLoading();
-      pushBotText(`Something went wrong while generating the plan. ${safeStr(e?.message)}`);
+      const message = e instanceof Error ? e.message : safeStr(e);
+      pushBotText(`Something went wrong while generating the plan. ${message}`);
     } finally {
       setIsSending(false);
     }
@@ -376,13 +499,25 @@ export default function Page() {
                   )}
 
                   {/* plan cards */}
-                  {m.kind === "plan" && m.role === "bot" && <PlanCards payload={m.planPayload} />}
+                  {m.kind === "plan" && m.role === "bot" && m.planPayload && <PlanCards payload={m.planPayload} />}
                 </div>
               </div>
             ))}
             <div ref={chatEndRef} />
           </div>
         </section>
+
+        {clarificationQuestions.length > 0 && (
+          <ClarificationPanel
+            questions={clarificationQuestions}
+            answers={planningContext}
+            disabled={isSending}
+            onAnswer={(questionId, value) => {
+              setPlanningContext((previous) => ({ ...previous, [questionId]: value }));
+            }}
+            onContinue={() => send(false)}
+          />
+        )}
 
         {/* Composer */}
         <footer className="sb-composerBar">
@@ -421,8 +556,8 @@ export default function Page() {
 
             <button
               className={`sb-sendBtn ${selectedFile && useText.trim() && !isSending ? "ready" : ""}`}
-              onClick={send}
-              disabled={isSending}
+              onClick={() => send()}
+              disabled={!selectedFile || !useText.trim() || isSending}
             >
               {isSending ? "Sending…" : "Send"}
             </button>
@@ -736,7 +871,85 @@ export default function Page() {
   );
 }
 
-function PlanCards({ payload }: { payload: any }) {
+function ClarificationPanel({
+  questions,
+  answers,
+  disabled,
+  onAnswer,
+  onContinue,
+}: {
+  questions: ClarificationQuestion[];
+  answers: PlanningContext;
+  disabled: boolean;
+  onAnswer: (questionId: string, value: string) => void;
+  onContinue: () => void;
+}) {
+  const isComplete = questions.every((question) => answers[question.id]);
+
+  return (
+    <section className="sb-clarify">
+      <div className="sb-clarifyInner">
+        <div className="sb-clarifyTitle">A few quick details for a more reliable plan</div>
+        {questions.map((question) => (
+          <div className="sb-question" key={question.id}>
+            <div className="sb-questionText">{question.question}</div>
+            <div className="sb-optionRow">
+              {question.options.map((option) => (
+                <button
+                  className={`sb-option ${answers[question.id] === option.value ? "selected" : ""}`}
+                  disabled={disabled}
+                  key={option.value}
+                  onClick={() => onAnswer(question.id, option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button className="sb-continue" disabled={!isComplete || disabled} onClick={onContinue}>
+          {disabled ? "Generating..." : "Generate tailored plan"}
+        </button>
+      </div>
+
+      <style jsx>{`
+        .sb-clarify{
+          flex: 0 0 auto;
+          border-top: 1px solid rgba(0,0,0,0.08);
+          background: #fff;
+          padding: 14px 18px;
+        }
+        .sb-clarifyInner{ max-width: 920px; margin: 0 auto; }
+        .sb-clarifyTitle{ font-weight: 900; margin-bottom: 10px; }
+        .sb-question{ margin-top: 10px; }
+        .sb-questionText{ font-size: 14px; font-weight: 800; margin-bottom: 7px; }
+        .sb-optionRow{ display: flex; flex-wrap: wrap; gap: 7px; }
+        .sb-option, .sb-continue{
+          border: 1px solid rgba(0,0,0,0.14);
+          border-radius: 10px;
+          background: #fff;
+          cursor: pointer;
+          font-weight: 800;
+          padding: 8px 10px;
+        }
+        .sb-option.selected{
+          border-color: rgba(63,174,88,0.8);
+          background: rgba(63,174,88,0.14);
+        }
+        .sb-continue{
+          margin-top: 12px;
+          border: none;
+          background: #3FAE58;
+          color: #fff;
+          padding: 10px 14px;
+        }
+        .sb-option:disabled, .sb-continue:disabled{ opacity: 0.55; cursor: not-allowed; }
+      `}</style>
+    </section>
+  );
+}
+
+function PlanCards({ payload }: { payload: PlanPayload }) {
   const plan = payload?.plan || {};
   const material = plan?.material || payload?.material || {};
   const orientation = plan?.orientation || payload?.orientation || {};
@@ -766,8 +979,12 @@ function PlanCards({ payload }: { payload: any }) {
     backendOverview ||
     guessOverviewFromDescription(descSource, supports, bed.label, stl);
 
-  const warningsList: { severity: string; why: string }[] =
-    risks?.items?.map((r: any) => ({ severity: safeStr(r.severity), why: safeStr(r.why) })) || [];
+  const warningsList: { severity: string; why: string }[] = [
+    ...(risks?.items?.map((risk) => ({ severity: safeStr(risk.severity), why: safeStr(risk.why) })) || []),
+    ...(payload?.warnings?.map((warning) => ({ severity: "low", why: safeStr(warning) })) || []),
+  ].filter((warning, index, items) => (
+    warning.why && items.findIndex((item) => item.why === warning.why) === index
+  ));
 
   const infillPct = slicer?.infill_percent ?? slicer?.["infill%"] ?? slicer?.infill ?? null;
 

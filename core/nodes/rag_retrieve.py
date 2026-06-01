@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
-from core.rag.retriever import retrieve
-from core.state import PlanState
-
-
 from core.state import PlanState
 from core.rag.retriever import retrieve
 
@@ -18,7 +12,17 @@ def rag_retrieve_node(state: PlanState) -> PlanState:
     # Keep query simple & aligned with knowledge headings
     query = f"{desc}. height {h}mm width {w}mm. brim supports tall print walls infill bed adhesion materials PLA PETG ABS ASA TPU."
 
-    docs = retrieve(query, k=3)
+    try:
+        docs = retrieve(query, k=3)
+    except Exception:
+        warnings = state.get("warnings", []) or []
+        warning = "Knowledge retrieval is unavailable. Continuing with the deterministic print plan."
+        if warning not in warnings:
+            warnings.append(warning)
+        state["warnings"] = warnings
+        state["rag_context"] = ""
+        state["rag_sources"] = []
+        return state
 
     snippets = []
     sources = []

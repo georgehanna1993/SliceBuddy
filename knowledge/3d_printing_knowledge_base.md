@@ -135,3 +135,55 @@ First Layer Best Practices
 	•	Slow speed
 	•	Clean bed
 	•	Correct Z offset
+
+⸻
+
+Use-Case Questions Before Recommending Settings
+	•	Where will the part be used: indoors, outdoors, sunlight, inside a car, or near an engine?
+	•	Is the goal decorative appearance, general use, mechanical strength, or flexibility?
+	•	Will the part hold weight or experience repeated force?
+	•	Is failure merely inconvenient, or could failure cause injury or property damage?
+	•	STL files are unitless. Confirm millimeters if dimensions look unexpected.
+
+⸻
+
+Environment Guidance
+
+Indoor decorative parts
+	•	PLA is usually the easiest starting point
+	•	Focus on appearance and clean surfaces
+	•	Moderate infill is usually sufficient
+
+Outdoor or sunlight exposure
+	•	ASA is preferred for UV and weather resistance
+	•	PETG can be an alternative for less demanding exposure
+	•	Consider drainage and water traps in the model
+
+Inside a car
+	•	Vehicle interiors can become hot in sunlight
+	•	PLA can soften in elevated temperatures
+	•	ASA is a more conservative starting recommendation
+	•	Test fit and performance under realistic heat exposure
+
+Car parts, engine areas, and safety-critical parts
+	•	A print plan is not a safety certification
+	•	Heat, vibration, load cycles, chemicals, and failure consequences matter
+	•	Use engineering review and physical testing before relying on a printed part
+	•	Do not rely on a hobby FDM print for safety-critical use without validation
+
+⸻
+
+Load Guidance
+	•	No meaningful load: optimize for print quality and ease
+	•	Light load: use at least general-purpose wall settings
+	•	Regular functional load: increase walls and infill; PETG is often a practical starting point
+	•	High load: increase walls and infill, analyze load direction, and physically test the part
+	•	Layer orientation matters because FDM parts are weakest between layers
+
+⸻
+
+Reliability Boundaries
+	•	Geometry analysis can detect mesh health, dimensions, contact area, and overhang signals
+	•	Geometry analysis cannot infer real-world load direction, printer calibration, filament quality, or required safety factor
+	•	User context and printer profile data are needed for a more reliable recommendation
+	•	Always test critical prints under realistic conditions
