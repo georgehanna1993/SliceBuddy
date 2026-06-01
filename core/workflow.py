@@ -17,11 +17,6 @@ from core.nodes.model_overview import model_overview_node
 from core.nodes.explain_plan import explain_plan_node
 from core.nodes.clarify_input import clarify_input_node
 
-# LLM-related nodes (optional)
-from core.nodes.explain_plan_llm import explain_plan_llm_node
-from core.nodes.rag_retrieve import rag_retrieve_node
-
-
 def ASSEMBLE_PLAN_node(state: PlanState) -> PlanState:
     desc = state.get("description", "")
     h = state.get("height_mm", 0)
@@ -60,6 +55,9 @@ def build_plan_app():
     graph.add_node("EXPLAIN_PLAN_LOCAL", explain_plan_node)
 
     if use_llm:
+        from core.nodes.explain_plan_llm import explain_plan_llm_node
+        from core.nodes.rag_retrieve import rag_retrieve_node
+
         graph.add_node("RAG_RETRIEVE", rag_retrieve_node)
         graph.add_node("EXPLAIN_PLAN", explain_plan_llm_node)
 

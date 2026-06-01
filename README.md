@@ -190,6 +190,22 @@ Chroma stores embeddings locally in:
 
 ## 🛠 Installation
 
+### Docker Local Edition
+
+The easiest local setup is Docker. It runs entirely on the user's computer and
+does not require an API key or paid service.
+
+```bash
+docker compose up --build --detach
+```
+
+Open `http://127.0.0.1:3000`.
+
+For beginner-friendly launch files and troubleshooting, see
+[`START_HERE.md`](START_HERE.md).
+
+### Manual Developer Setup
+
 Create a virtual environment:
 
 ```bash

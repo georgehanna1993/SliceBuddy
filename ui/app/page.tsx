@@ -429,7 +429,7 @@ export default function Page() {
                 src="/logo.png"
                 alt="SliceBuddy"
                 width={220}
-                height={120}
+                height={57}
                 priority
                 className="sb-logo"
               />
@@ -618,8 +618,6 @@ export default function Page() {
         }
 
         .sb-logo{
-          width: 220px;
-          height: auto;
           object-fit: contain;
           display: block;
         }

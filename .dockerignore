@@ -1,0 +1,15 @@
+.chroma/
+.env
+.git/
+.github/
+.idea/
+.venv/
+__pycache__/
+*.pyc
+*.stl
+docs/
+knowledge/
+scripts/
+slicebuddy/
+tests/
+ui/
