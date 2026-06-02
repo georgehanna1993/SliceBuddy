@@ -18,7 +18,11 @@ type PlanItem = {
   createdAt: number;
 };
 
-type STLFeatures = {
+type ModelFeatures = {
+  source_format?: string;
+  source_unit?: string;
+  object_count?: number;
+  build_item_count?: number;
   bbox_mm?: number[];
   contact_area_mm2?: number;
   contact_ratio?: number;
@@ -39,6 +43,14 @@ type SlicerSettings = {
   top_bottom_layers?: number;
   topBottom?: number;
   layer_height_mm?: number;
+  print_speed_mm_s?: number;
+  outer_wall_speed_mm_s?: number;
+  first_layer_speed_mm_s?: number;
+  travel_speed_mm_s?: number;
+  support_speed_mm_s?: number;
+  bridge_speed_mm_s?: number;
+  cooling_guidance?: string;
+  temperature_guidance?: string;
   notes?: string[] | string;
 };
 
@@ -74,7 +86,7 @@ type PlanPayload = {
   description?: string;
   warnings?: string[];
   plan_explanation?: string;
-  stl_features?: STLFeatures;
+  stl_features?: ModelFeatures;
   material?: PrintPlan["material"];
   orientation?: PrintPlan["orientation"];
   input_norm?: {
@@ -105,7 +117,7 @@ type ClarificationQuestion = {
 type PlanningContext = Record<string, string>;
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
-const MAX_STL_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_MODEL_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 function safeStr(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -125,7 +137,7 @@ function severityLabel(s: string) {
   return { tag: "LOW", cls: "sb-sevLow" };
 }
 
-function bedContactLabel(stl?: STLFeatures) {
+function bedContactLabel(stl?: ModelFeatures) {
   if (!stl) return { label: "Unknown", tone: "muted" as const };
   const area = Number(stl.contact_area_mm2 || 0);
   const ratio = Number(stl.contact_ratio || 0);
@@ -180,7 +192,7 @@ function fmtDims(payload?: PlanPayload) {
  * Goal: "Maybe it's a …" + practical print implications.
  * This is ONLY used if backend didn’t provide model_overview.
  */
-function guessOverviewFromDescription(descRaw: string, supports: string, bedLabel: string, stl?: STLFeatures) {
+function guessOverviewFromDescription(descRaw: string, supports: string, bedLabel: string, stl?: ModelFeatures) {
   const desc = (descRaw || "").toLowerCase();
 
   let guess = "a general 3D model";
@@ -208,7 +220,7 @@ function guessOverviewFromDescription(descRaw: string, supports: string, bedLabe
   // Mesh health note (beginner friendly)
   const meshNote =
     stl && stl.watertight === false
-      ? "Mesh has openings/holes, so repairing the STL is recommended before printing."
+      ? "Mesh has openings/holes, so repairing the model is recommended before printing."
       : "";
 
   // Practical hint based on supports + bed contact labels
@@ -242,7 +254,7 @@ export default function Page() {
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: "bot", kind: "text", text: "Upload an STL + tell me what it’s used for, and I’ll generate a print plan." },
+    { role: "bot", kind: "text", text: "Upload an STL or 3MF + tell me what it’s used for, and I’ll generate a print plan." },
   ]);
 
   const [useText, setUseText] = useState("");
@@ -272,7 +284,7 @@ export default function Page() {
     setActivePlanId(id);
 
     setMessages([
-      { role: "bot", kind: "text", text: "Upload an STL + tell me what it’s used for, and I’ll generate a print plan." },
+      { role: "bot", kind: "text", text: "Upload an STL or 3MF + tell me what it’s used for, and I’ll generate a print plan." },
     ]);
     setUseText("");
     setSelectedFile(null);
@@ -288,14 +300,14 @@ export default function Page() {
 
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
-    if (f && !f.name.toLowerCase().endsWith(".stl")) {
-      pushBotText("Please choose a file ending in .stl.");
+    if (f && !/\.(stl|3mf)$/i.test(f.name)) {
+      pushBotText("Please choose a file ending in .stl or .3mf.");
       e.target.value = "";
       setSelectedFile(null);
       return;
     }
-    if (f && f.size > MAX_STL_UPLOAD_BYTES) {
-      pushBotText("That STL is larger than the 25 MB upload limit.");
+    if (f && f.size > MAX_MODEL_UPLOAD_BYTES) {
+      pushBotText("That model file is larger than the 25 MB upload limit.");
       e.target.value = "";
       setSelectedFile(null);
       return;
@@ -327,7 +339,7 @@ export default function Page() {
   async function send(includeUserMessage = true) {
     const trimmed = useText.trim();
     if (!selectedFile) {
-      pushBotText("Please choose an STL first (tap the +).");
+      pushBotText("Please choose an STL or 3MF first (tap the +).");
       return;
     }
     if (!trimmed) {
@@ -389,7 +401,7 @@ export default function Page() {
         setClarificationQuestions(data.clarification_questions);
         pushBotText(
           safeStr(data.plan_explanation) ||
-          "I analyzed the STL. Answer these quick questions so I can tailor the plan."
+          "I analyzed the model file. Answer these quick questions so I can tailor the plan."
         );
         return;
       }
@@ -447,7 +459,7 @@ export default function Page() {
             {plans.length === 0 ? (
               <div className="sb-planEmpty">
                 <div className="sb-planEmptyTitle">No plans yet.</div>
-                <div className="sb-planEmptyHint">Upload an STL to create your first plan.</div>
+                <div className="sb-planEmptyHint">Upload an STL or 3MF to create your first plan.</div>
               </div>
             ) : (
               plans.map((p) => (
@@ -524,13 +536,13 @@ export default function Page() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".stl"
+            accept=".stl,.3mf"
             onChange={onFilePicked}
             style={{ display: "none" }}
           />
 
           <div className="sb-composer">
-            <button className="sb-plusBtn" onClick={pickFile} title="Choose STL" disabled={isSending}>
+            <button className="sb-plusBtn" onClick={pickFile} title="Choose STL or 3MF" disabled={isSending}>
               +
             </button>
 
@@ -546,7 +558,7 @@ export default function Page() {
                 }}
               />
               <div className="sb-fileHint" aria-live="polite">
-                {selectedFile ? `STL: ${selectedFile.name}` : "Tap + to choose an STL"}
+                {selectedFile ? `Model: ${selectedFile.name}` : "Tap + to choose an STL or 3MF"}
               </div>
             </div>
 
@@ -563,7 +575,7 @@ export default function Page() {
             </button>
           </div>
 
-          <div className="sb-footnote">Requirement: upload an STL + describe what it’s used for.</div>
+          <div className="sb-footnote">Requirement: upload an STL or 3MF + describe what it’s used for.</div>
         </footer>
       </main>
 
@@ -993,6 +1005,12 @@ function PlanCards({ payload }: { payload: PlanPayload }) {
 
         <div className="sb-chipRow">
           {dims && <span className="sb-chip">📏 Size: {dims}</span>}
+          {stl?.source_format && (
+            <span className="sb-chip">
+              📦 Source: {stl.source_format.toUpperCase()}
+              {stl.source_unit ? ` (${stl.source_unit.replaceAll("_", " ")})` : ""}
+            </span>
+          )}
           {stl && (
             <span className={`sb-chip ${stl?.watertight ? "ok" : "bad"}`}>
               🩺 Mesh: {stl?.watertight ? "OK" : "Needs repair"}
@@ -1050,6 +1068,23 @@ function PlanCards({ payload }: { payload: PlanPayload }) {
           <KV
             k="Notes"
             v={Array.isArray(slicer?.notes) ? slicer.notes.join(" • ") : safeStr(slicer?.notes || "")}
+          />
+        </Card>
+
+        <Card title="🏎️ Speeds" subtitle="Conservative starting values">
+          <KV k="Print" v={`${Number(slicer?.print_speed_mm_s ?? 60)} mm/s`} />
+          <KV k="Outer wall" v={`${Number(slicer?.outer_wall_speed_mm_s ?? 35)} mm/s`} />
+          <KV k="First layer" v={`${Number(slicer?.first_layer_speed_mm_s ?? 20)} mm/s`} />
+          <KV k="Travel" v={`${Number(slicer?.travel_speed_mm_s ?? 150)} mm/s`} />
+          <KV k="Supports" v={`${Number(slicer?.support_speed_mm_s ?? 45)} mm/s`} />
+          <KV k="Bridges" v={`${Number(slicer?.bridge_speed_mm_s ?? 25)} mm/s`} />
+        </Card>
+
+        <Card title="🌡️ Process" subtitle="Profile guidance">
+          <KV k="Cooling" v={safeStr(slicer?.cooling_guidance || "Use your filament profile defaults.")} />
+          <KV
+            k="Temperature"
+            v={safeStr(slicer?.temperature_guidance || "Use your filament manufacturer's printer profile.")}
           />
         </Card>
       </div>

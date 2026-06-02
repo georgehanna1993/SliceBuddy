@@ -5,7 +5,7 @@ from core.state import PlanState
 def generate_slicer_settings_node(state: PlanState) -> PlanState:
     """
     Rule-based slicer settings generator.
-    Uses material + normalized dimensions + STL signals (supports + contact area/ratio) when available.
+    Uses material + normalized dimensions + model signals (supports + contact area/ratio) when available.
     Writes state["slicer_settings"].
 
     IMPORTANT:
@@ -25,13 +25,14 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
     w = float(norm.get("width_mm", 0) or 0)
     aspect = (h / w) if (h > 0 and w > 0) else 0.0
 
-    # --- STL signals (optional) ---
+    # --- Model signals (optional) ---
     stl = state.get("stl_features") or {}
-    used_stl = bool(stl)
-    likely_supports = bool(stl.get("likely_supports", False)) if used_stl else False
-    contact_area = float(stl.get("contact_area_mm2", 0) or 0) if used_stl else 0.0
-    contact_ratio = float(stl.get("contact_ratio", 0) or 0) if used_stl else 0.0
-    watertight = bool(stl.get("watertight", True)) if used_stl else None
+    used_model = bool(stl)
+    source_format = str(stl.get("source_format", "stl")) if used_model else None
+    likely_supports = bool(stl.get("likely_supports", False)) if used_model else False
+    contact_area = float(stl.get("contact_area_mm2", 0) or 0) if used_model else 0.0
+    contact_ratio = float(stl.get("contact_ratio", 0) or 0) if used_model else 0.0
+    watertight = bool(stl.get("watertight", True)) if used_model else None
 
     mat = (material_info.get("recommended") or "PLA").upper()
 
@@ -45,6 +46,14 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         "infill_reason": "Good all-around strength and supports top layers well without harsh direction bias.",
         "supports": "off (unknown geometry)",
         "brim_mm": 0,
+        "print_speed_mm_s": 60,
+        "outer_wall_speed_mm_s": 35,
+        "first_layer_speed_mm_s": 20,
+        "travel_speed_mm_s": 150,
+        "support_speed_mm_s": 45,
+        "bridge_speed_mm_s": 25,
+        "cooling_guidance": "Use your filament profile cooling defaults.",
+        "temperature_guidance": "Use the filament manufacturer's printer profile; exact temperatures vary by filament and printer.",
         "notes": [],
     }
 
@@ -54,6 +63,10 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
     elif mat == "PETG":
         settings["top_bottom_layers"] = 5
         settings["infill_percent"] = 18
+        settings["print_speed_mm_s"] = 50
+        settings["outer_wall_speed_mm_s"] = 30
+        settings["support_speed_mm_s"] = 35
+        settings["cooling_guidance"] = "Use moderate cooling from your PETG profile; too much fan can reduce layer bonding."
         settings["notes"].append("PETG: tougher than PLA; watch stringing.")
         assumptions.append("Assuming PETG benefits from extra top/bottom for stiffness.")
     elif mat in ("ABS", "ASA"):
@@ -61,6 +74,10 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         settings["top_bottom_layers"] = 5
         settings["infill_percent"] = 20
         settings["brim_mm"] = 6
+        settings["print_speed_mm_s"] = 50
+        settings["outer_wall_speed_mm_s"] = 30
+        settings["support_speed_mm_s"] = 35
+        settings["cooling_guidance"] = "Use low cooling from your ABS/ASA profile and avoid drafts."
         settings["notes"].append("ABS/ASA: brim helps; enclosure recommended.")
         warnings.append("ABS/ASA warping risk: consider enclosure and stable ambient temperature.")
     elif mat == "TPU":
@@ -69,6 +86,13 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         settings["top_bottom_layers"] = 4
         settings["infill_percent"] = 12
         settings["supports"] = "off unless absolutely necessary"
+        settings["print_speed_mm_s"] = 25
+        settings["outer_wall_speed_mm_s"] = 20
+        settings["first_layer_speed_mm_s"] = 15
+        settings["travel_speed_mm_s"] = 120
+        settings["support_speed_mm_s"] = 20
+        settings["bridge_speed_mm_s"] = 20
+        settings["cooling_guidance"] = "Start with your TPU profile cooling; tune only after a small test print."
         settings["notes"].append("TPU: print slowly; avoid aggressive retraction.")
         assumptions.append("Assuming TPU printed slowly with conservative retraction settings.")
 
@@ -99,14 +123,16 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         settings["walls"] = max(settings["walls"], 4)
         settings["notes"].append("Tall model: increased walls + brim for stability.")
         warnings.append("Tall aspect ratio: consider slowing down and using a brim.")
+        settings["print_speed_mm_s"] = min(settings["print_speed_mm_s"], 40)
+        settings["outer_wall_speed_mm_s"] = min(settings["outer_wall_speed_mm_s"], 25)
+        settings["first_layer_speed_mm_s"] = min(settings["first_layer_speed_mm_s"], 15)
 
-    # --- STL-based support detection (REAL geometry) ---
-    # If the STL analyzer says supports likely needed, reflect that.
-    if used_stl and likely_supports:
-        settings["supports"] = "on (STL overhang detected)"
-        warnings.append("STL overhang detected. Supports likely needed.")
-    elif used_stl:
-        settings["supports"] = "off (STL geometry checked)"
+    # --- Model-based support detection (real geometry) ---
+    if used_model and likely_supports:
+        settings["supports"] = "on (model overhang detected)"
+        warnings.append("Model overhang detected. Supports likely needed.")
+    elif used_model:
+        settings["supports"] = "off (model geometry checked)"
 
     # --- Keyword-based support hints (user text) ---
     # If the user explicitly says overhang/cantilever/bridge, we force supports on.
@@ -115,15 +141,15 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         settings["notes"].append("Overhang-related keywords: supports likely needed unless re-oriented.")
         warnings.append("Overhang hints detected. Supports may be needed.")
 
-    # --- STL-based adhesion tweaks (contact area > bbox-based) ---
+    # --- Model-based adhesion tweaks (contact area > bbox-based) ---
     # 1) Very small real contact area (diamond tip case)
-    if used_stl and 0 < contact_area <= 500:
+    if used_model and 0 < contact_area <= 500:
         settings["brim_mm"] = max(settings["brim_mm"], 8)
         settings["notes"].append("Very small bed contact: brim strongly recommended.")
         warnings.append("Very small bed contact area detected. High adhesion failure risk.")
 
     # 2) Pointy base signal (low contact_ratio)
-    if used_stl and 0 < contact_ratio < 0.15:
+    if used_model and 0 < contact_ratio < 0.15:
         settings["brim_mm"] = max(settings["brim_mm"], 10)
         settings["notes"].append("Pointy base contact: consider re-orienting or adding raft/brim.")
         warnings.append("Pointy base contact detected. Consider changing orientation or adding a raft/brim.")
@@ -138,6 +164,7 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
         settings["walls"] = max(settings["walls"], 5)
         settings["infill_percent"] = max(settings["infill_percent"], 40)
         settings["notes"].append("High load: increased walls/infill. Validate with a physical test before relying on the part.")
+        settings["outer_wall_speed_mm_s"] = min(settings["outer_wall_speed_mm_s"], 30)
     elif load == "moderate":
         settings["walls"] = max(settings["walls"], 4)
         settings["infill_percent"] = max(settings["infill_percent"], 30)
@@ -154,11 +181,13 @@ def generate_slicer_settings_node(state: PlanState) -> PlanState:
             "height_mm": round(h, 2),
             "width_mm": round(w, 2),
             "aspect_ratio": round(aspect, 2),
-            "used_stl": used_stl,
-            "contact_area_mm2": round(contact_area, 2) if used_stl else None,
-            "contact_ratio": round(contact_ratio, 3) if used_stl else None,
+            "used_stl": used_model,
+            "used_model": used_model,
+            "source_format": source_format,
+            "contact_area_mm2": round(contact_area, 2) if used_model else None,
+            "contact_ratio": round(contact_ratio, 3) if used_model else None,
             "watertight": watertight,
-            "likely_supports": likely_supports if used_stl else None,
+            "likely_supports": likely_supports if used_model else None,
         },
     }
 

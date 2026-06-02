@@ -18,6 +18,9 @@ def explain_plan_node(state: PlanState) -> PlanState:
         f"- **Supports:** {slicer.get('supports', 'off (unknown geometry)')}",
         f"- **Brim:** {slicer.get('brim_mm', 0)} mm",
         f"- **Layer height:** {slicer.get('layer_height_mm', 0.2)} mm",
+        f"- **Print speed:** {slicer.get('print_speed_mm_s', 60)} mm/s",
+        f"- **Outer wall speed:** {slicer.get('outer_wall_speed_mm_s', 35)} mm/s",
+        f"- **First layer speed:** {slicer.get('first_layer_speed_mm_s', 20)} mm/s",
         f"- **Walls:** {slicer.get('walls', 3)}",
         f"- **Infill:** {slicer.get('infill_percent', 15)}% {slicer.get('infill_pattern', 'gyroid')}",
     ]

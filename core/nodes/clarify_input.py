@@ -65,7 +65,7 @@ def clarify_input_node(state: PlanState) -> PlanState:
 
     if missing_questions:
         state["plan_explanation"] = (
-            "I analyzed the STL. Before I recommend material and slicer settings, "
+            "I analyzed the model file. Before I recommend material and slicer settings, "
             "answer a few quick questions so the plan matches the real use case."
         )
 

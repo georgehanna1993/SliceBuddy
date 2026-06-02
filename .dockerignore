@@ -7,6 +7,7 @@
 __pycache__/
 *.pyc
 *.stl
+*.3mf
 docs/
 knowledge/
 scripts/

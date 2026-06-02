@@ -144,6 +144,7 @@ Use-Case Questions Before Recommending Settings
 	•	Will the part hold weight or experience repeated force?
 	•	Is failure merely inconvenient, or could failure cause injury or property damage?
 	•	STL files are unitless. Confirm millimeters if dimensions look unexpected.
+	•	3MF files declare units. Convert those dimensions to millimeters before recommending settings.
 
 ⸻
 
@@ -187,3 +188,12 @@ Reliability Boundaries
 	•	Geometry analysis cannot infer real-world load direction, printer calibration, filament quality, or required safety factor
 	•	User context and printer profile data are needed for a more reliable recommendation
 	•	Always test critical prints under realistic conditions
+
+⸻
+
+Speed Guidance
+	•	Speed values are conservative starting points, not guarantees.
+	•	Use slower first layers for adhesion.
+	•	Reduce print and outer-wall speed for tall models to limit wobble.
+	•	Print TPU slowly and avoid aggressive retraction.
+	•	Use the filament manufacturer's printer profile for exact temperatures.

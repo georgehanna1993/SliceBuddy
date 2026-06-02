@@ -51,4 +51,4 @@ docker compose down
 - The first startup takes longer because Docker downloads and builds the local
   app images.
 - Make sure ports `3000` and `8000` are not already used by another program.
-- Uploaded STL files are processed temporarily and removed after analysis.
+- Uploaded STL and 3MF files are processed temporarily and removed after analysis.

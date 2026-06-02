@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+from pathlib import Path
 from typing import Any, Dict, Tuple
 import numpy as np
 import trimesh
+from .three_mf import load_3mf_mesh
 
 
 @dataclass
-class STLFeatures:
+class ModelFeatures:
+    source_format: str
+    source_unit: str
+    object_count: int
+    build_item_count: int
     bbox_mm: Tuple[float, float, float]  # (x, y, z)
     footprint_bbox_mm2: float            # bbox x*y
     contact_area_mm2: float              # estimated real bed contact area
@@ -178,28 +184,38 @@ def _mesh_issue_summary(watertight: bool, is_volume: bool, boundary_edges: int, 
     return "; ".join(parts)
 
 
-def analyze_stl(path: str) -> Dict[str, Any]:
+def _load_model_mesh(path: str) -> tuple[trimesh.Trimesh, str, str, int, int]:
+    source_format = Path(path).suffix.lower().lstrip(".")
+    if source_format == "3mf":
+        model = load_3mf_mesh(path)
+        return model.mesh, "3mf", model.source_unit, model.object_count, model.build_item_count
+    if source_format != "stl":
+        raise ValueError("the model file must use the .stl or .3mf extension")
+
     try:
         mesh = trimesh.load(path, force="mesh")
     except Exception as exc:
         raise ValueError("the file is not a readable STL mesh") from exc
-
     if isinstance(mesh, trimesh.Scene):
         geometries = list(mesh.geometry.values())
         if not geometries:
             raise ValueError("the STL does not contain any geometry")
         mesh = trimesh.util.concatenate(geometries)
+    return mesh, "stl", "unitless_assumed_mm", 1, 1
 
+
+def analyze_model(path: str) -> Dict[str, Any]:
+    mesh, source_format, source_unit, object_count, build_item_count = _load_model_mesh(path)
     if not isinstance(mesh, trimesh.Trimesh):
-        raise ValueError("the STL did not load as a triangle mesh")
+        raise ValueError("the model did not load as a triangle mesh")
     if mesh.vertices is None or len(mesh.vertices) == 0:
-        raise ValueError("the STL does not contain any vertices")
+        raise ValueError("the model does not contain any vertices")
     if mesh.faces is None or len(mesh.faces) == 0:
-        raise ValueError("the STL does not contain any triangle faces")
+        raise ValueError("the model does not contain any triangle faces")
 
     x, y, z = [float(v) for v in mesh.extents]
     if not np.isfinite([x, y, z]).all() or min(x, y, z) <= 0:
-        raise ValueError("the STL has invalid or zero-sized dimensions")
+        raise ValueError("the model has invalid or zero-sized dimensions")
 
     footprint_bbox = float(x * y)
 
@@ -231,7 +247,11 @@ def analyze_stl(path: str) -> Dict[str, Any]:
         degenerate_faces=degenerate_faces,
     )
 
-    feats = STLFeatures(
+    feats = ModelFeatures(
+        source_format=source_format,
+        source_unit=source_unit,
+        object_count=object_count,
+        build_item_count=build_item_count,
         bbox_mm=(x, y, z),
         footprint_bbox_mm2=footprint_bbox,
         contact_area_mm2=contact_area,
@@ -254,3 +274,8 @@ def analyze_stl(path: str) -> Dict[str, Any]:
         bounds_mm=(bmin, bmax),
     )
     return asdict(feats)
+
+
+def analyze_stl(path: str) -> Dict[str, Any]:
+    """Backwards-compatible entry point for STL and 3MF model analysis."""
+    return analyze_model(path)

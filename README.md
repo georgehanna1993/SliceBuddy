@@ -3,7 +3,7 @@
 
 SliceBuddy is an agentic AI system for intelligent **3D print planning**.
 
-It analyzes an STL file and usage description, then produces a structured, practical print plan — similar to how an experienced maker reasons before slicing a model.
+It analyzes an STL or 3MF model file and usage description, then produces a structured, practical print plan — similar to how an experienced maker reasons before slicing a model.
 
 SliceBuddy focuses on planning, not model generation.
 
@@ -15,10 +15,11 @@ avoid treating a decorative indoor print like an outdoor or automotive part.
 
 ## 🚀 Features
 
-- STL geometry analysis (bounding box, contact area, overhangs, mesh health)
+- STL and 3MF geometry analysis (bounding box, contact area, overhangs, mesh health)
+- 3MF unit-aware dimensions, build items, and component transforms
 - Material recommendation (PLA / PETG / ABS / ASA / TPU)
 - Orientation planning
-- Slicer settings generation (walls, infill, supports, brim)
+- Slicer settings generation (walls, infill, supports, brim, speeds, cooling guidance)
 - Print risk detection with mitigations
 - Guided clarification for environment, purpose, and expected load
 - Optional RAG knowledge grounding (Chroma + Markdown KB)
@@ -57,7 +58,7 @@ The LLM is used only for explanation, not decision-making.
 - LangChain
 - OpenAI
 - ChromaDB (persistent local vector store)
-- Trimesh (STL analysis)
+- Trimesh (model analysis)
 
 ---
 
@@ -70,7 +71,7 @@ app/
 core/
   nodes/                 # LangGraph workflow nodes
   rag/                   # RAG + Chroma integration
-  stl/                   # STL analysis engine
+  stl/                   # STL and 3MF analysis engine
 
 knowledge/
   3d_printing_knowledge_base.md
@@ -93,7 +94,7 @@ ui/
 
 ---
 
-## 📊 STL Geometry Analysis
+## 📊 Model Geometry Analysis
 
 SliceBuddy extracts:
 
@@ -113,6 +114,10 @@ SliceBuddy extracts:
 
 These signals drive planning decisions.
 
+STL files do not contain a standard unit, so SliceBuddy assumes millimeters.
+3MF files preserve their declared unit and SliceBuddy converts dimensions to
+millimeters before generating recommendations.
+
 ---
 
 ## 🖥 CLI Usage
@@ -127,6 +132,7 @@ Outputs:
 - Orientation suggestion
 - Support & brim guidance
 - Strength settings
+- Conservative speed and process guidance
 - Risk warnings
 
 ---
@@ -148,7 +154,7 @@ curl http://127.0.0.1:8000/health
 Send a POST request to `/plan` with:
 
 - `use` (form field)
-- `stl` (file upload)
+- `stl` (legacy form field name; accepts `.stl` or `.3mf` model uploads)
 
 Example response:
 

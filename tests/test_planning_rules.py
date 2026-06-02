@@ -84,7 +84,26 @@ class PlanningRulesTests(unittest.TestCase):
         self.assertEqual("ASA", state["material"]["recommended"])
         self.assertGreaterEqual(settings["walls"], 5)
         self.assertGreaterEqual(settings["infill_percent"], 40)
+        self.assertLessEqual(settings["outer_wall_speed_mm_s"], 30)
         self.assertIn("validate_critical_part", [risk["id"] for risk in state["risks"]["items"]])
+
+    def test_tall_model_reduces_speed_for_stability(self):
+        settings = run_rules("tall decorative vase", 180, 40)["slicer_settings"]["settings"]
+
+        self.assertLessEqual(settings["print_speed_mm_s"], 40)
+        self.assertLessEqual(settings["outer_wall_speed_mm_s"], 25)
+        self.assertLessEqual(settings["first_layer_speed_mm_s"], 15)
+
+    def test_tpu_uses_slow_speed_baseline(self):
+        settings = run_rules(
+            "flexible protective sleeve",
+            40,
+            40,
+            {"environment": "indoor", "purpose": "flexible", "load": "light"},
+        )["slicer_settings"]["settings"]
+
+        self.assertEqual(25, settings["print_speed_mm_s"])
+        self.assertEqual(15, settings["first_layer_speed_mm_s"])
 
 
 if __name__ == "__main__":

@@ -1,1 +1,1 @@
-from .analyze import analyze_stl
+from .analyze import analyze_model, analyze_stl

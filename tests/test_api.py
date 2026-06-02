@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 import trimesh
 
 from app.main import app
+from tests.three_mf_fixture import box_3mf_bytes
 
 
 class APITests(unittest.TestCase):
@@ -88,6 +89,27 @@ class APITests(unittest.TestCase):
             ["environment", "purpose", "load"],
             [question["id"] for question in payload["clarification_questions"]],
         )
+
+    def test_generates_plan_for_valid_3mf(self):
+        response = self.client.post(
+            "/plan",
+            data={
+                "use": "functional wall mount bracket",
+                "planning_context": json.dumps({
+                    "environment": "indoor",
+                    "purpose": "functional",
+                    "load": "moderate",
+                }),
+            },
+            files={"stl": ("bracket.3mf", box_3mf_bytes(), "model/3mf")},
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("3mf", payload["stl_features"]["source_format"])
+        self.assertEqual("millimeter", payload["stl_features"]["source_unit"])
+        self.assertEqual([10.0, 20.0, 30.0], payload["stl_features"]["bbox_mm"])
+        self.assertIn("print_speed_mm_s", payload["plan"]["slicer_settings"]["settings"])
 
 
 if __name__ == "__main__":

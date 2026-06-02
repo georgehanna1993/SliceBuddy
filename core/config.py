@@ -20,14 +20,19 @@ def get_bool_env(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def get_max_stl_upload_bytes() -> int:
-    """Return the configured STL upload limit in bytes."""
+def get_max_model_upload_bytes() -> int:
+    """Return the configured model-file upload limit in bytes."""
     raw_value = os.getenv("MAX_STL_UPLOAD_MB", "25")
     try:
         megabytes = int(raw_value)
     except ValueError:
         megabytes = 25
     return max(1, megabytes) * 1024 * 1024
+
+
+def get_max_stl_upload_bytes() -> int:
+    """Backwards-compatible alias for the model-file upload limit."""
+    return get_max_model_upload_bytes()
 
 
 def get_cors_origins() -> list[str]:

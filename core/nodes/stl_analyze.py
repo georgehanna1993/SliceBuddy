@@ -1,17 +1,17 @@
 from core.state import PlanState
-from core.stl import analyze_stl
+from core.stl import analyze_model
 
 
 def stl_analyze_node(state: PlanState) -> PlanState:
     """
-    If stl_path exists, analyze STL and store stl_features.
+    If stl_path exists, analyze the uploaded model and store geometry features.
     Also auto-fill height_mm and width_mm so the existing pipeline keeps working.
     """
     path = (state.get("stl_path") or "").strip()
     if not path:
         return state
 
-    feats = analyze_stl(path)
+    feats = analyze_model(path)
     state["stl_features"] = feats
 
     # Backwards compatibility with existing logic:

@@ -7,7 +7,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.config import get_cors_origins, get_max_stl_upload_bytes
+from core.config import get_cors_origins, get_max_model_upload_bytes
 from core.workflow import build_plan_app
 
 
@@ -42,11 +42,12 @@ async def plan_endpoint(
     stl: UploadFile = File(...),
     planning_context: str = Form("{}"),
 ):
-    if Path(stl.filename or "").suffix.lower() != ".stl":
+    suffix = Path(stl.filename or "").suffix.lower()
+    if suffix not in {".stl", ".3mf"}:
         await stl.close()
-        raise HTTPException(status_code=415, detail="Upload an STL file with a .stl extension.")
+        raise HTTPException(status_code=415, detail="Upload a model file with a .stl or .3mf extension.")
 
-    max_upload_bytes = get_max_stl_upload_bytes()
+    max_upload_bytes = get_max_model_upload_bytes()
     total_bytes = 0
     tmp_path: str | None = None
 
@@ -58,19 +59,19 @@ async def plan_endpoint(
         if not isinstance(parsed_context, dict):
             raise HTTPException(status_code=422, detail="planning_context must be a JSON object.")
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".stl") as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp_path = tmp.name
             while chunk := await stl.read(1024 * 1024):
                 total_bytes += len(chunk)
                 if total_bytes > max_upload_bytes:
                     raise HTTPException(
                         status_code=413,
-                        detail=f"STL file exceeds the {max_upload_bytes // (1024 * 1024)} MB upload limit.",
+                        detail=f"Model file exceeds the {max_upload_bytes // (1024 * 1024)} MB upload limit.",
                     )
                 tmp.write(chunk)
 
         if total_bytes == 0:
-            raise HTTPException(status_code=422, detail="The uploaded STL file is empty.")
+            raise HTTPException(status_code=422, detail="The uploaded model file is empty.")
 
         result = plan_app.invoke({
             "description": use,
@@ -94,7 +95,7 @@ async def plan_endpoint(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=f"Could not analyze STL: {exc}") from exc
+        raise HTTPException(status_code=422, detail=f"Could not analyze model file: {exc}") from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Could not generate a print plan.") from exc
     finally:
